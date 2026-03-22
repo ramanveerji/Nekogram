@@ -136,6 +136,8 @@ public class UserHelper extends BaseController {
                 callback.accept(parsedPeer.toUser());
             } else if (!fallback) {
                 searchUser(userId, callback, fakeUser, true);
+            } else if (fakeUser != null) {
+                callback.accept(fakeUser.toUser());
             } else {
                 callback.accept(null);
             }
@@ -151,6 +153,8 @@ public class UserHelper extends BaseController {
                 callback.accept(parsedPeer.toChat());
             } else if (!fallback) {
                 searchChat(chatId, callback, fakeChat, true);
+            } else if (fakeChat != null) {
+                callback.accept(fakeChat.toChat());
             } else {
                 callback.accept(null);
             }
@@ -179,7 +183,12 @@ public class UserHelper extends BaseController {
                 return;
             }
             if (peer.username != null) {
-                resolvePeer(peer.username, resolved -> callback.accept(peer));
+                resolvePeer(peer.username, resolved -> {
+                    if (!resolved) {
+                        peer.username = null;
+                    }
+                    callback.accept(peer);
+                });
             } else {
                 callback.accept(peer);
             }
