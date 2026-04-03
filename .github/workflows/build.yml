@@ -48,24 +48,81 @@ jobs:
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
-          # Write to an absolute path so local.properties can reference it unambiguously
           echo "$KEYSTORE_BASE64" | base64 -d > "${{ github.workspace }}/release.jks"
 
-      - name: Setup local.properties
+      # Patch TMessagesProj_App/build.gradle signing block to read from
+      # Gradle project properties (-P flags) instead of local.properties.
+      # This avoids the Groovy evaluation-order bug where localProperties is
+      # null when signingConfigs {} is evaluated.
+      - name: Patch signing config to use project properties
         run: |
-          # Use absolute path for storeFile — Gradle's file() in TMessagesProj_App/build.gradle
-          # resolves relative to the module dir, so relative paths silently return null
-          echo "storeFile=${{ github.workspace }}/release.jks" >> local.properties
-          echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" >> local.properties
-          echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> local.properties
-          echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> local.properties
-          # Fix ndk.dir deprecation warning by removing it and using ndkVersion instead
-          echo "android.ndkVersion=27.3.13750724" >> local.properties
+          FILE="TMessagesProj_App/build.gradle"
+
+          # Replace the entire signingConfigs block with one that reads
+          # from project properties passed via -P on the command line.
+          # We use a Python heredoc to avoid any shell quoting hell with awk/sed.
+          python3 - "$FILE" << 'PYEOF'
+          import re, sys
+
+          path = sys.argv[1]
+          src  = open(path).read()
+
+          new_signing = '''\
+      signingConfigs {
+          sign {
+              storeFile     file(project.findProperty("KEYSTORE_PATH") ?: "")
+              storePassword (project.findProperty("KEYSTORE_PASSWORD") ?: "")
+              keyAlias      (project.findProperty("KEY_ALIAS")         ?: "")
+              keyPassword   (project.findProperty("KEY_PASSWORD")      ?: "")
+          }
+      }'''
+
+          # Replace the old signingConfigs { ... } block (handles nested braces)
+          out, depth, i, start = [], 0, 0, -1
+          while i < len(src):
+              if src[i:].startswith('signingConfigs') and start == -1:
+                  start = i
+                  depth = 0
+              if start != -1:
+                  if src[i] == '{':
+                      depth += 1
+                  elif src[i] == '}':
+                      depth -= 1
+                      if depth == 0:
+                          out.append(new_signing)
+                          start = -1
+                          i += 1
+                          continue
+              else:
+                  out.append(src[i])
+              i += 1
+
+          result = ''.join(out)
+
+          # Also fix the two buildTypes references that conditionally pick signingConfig:
+          # replace both `if (localProperties...) { signingConfig signingConfigs.sign }` guards
+          # with unconditional `signingConfig signingConfigs.sign`
+          result = re.sub(
+              r'if\s*\(localProperties\.getProperty\(["\']storeFile["\']\)\s*!=\s*null\)\s*\{\s*signingConfig signingConfigs\.sign\s*\}',
+              'signingConfig signingConfigs.sign',
+              result
+          )
+          # Remove the fallback `else { signingConfig signingConfigs.debug }` if present
+          result = re.sub(
+              r'\}\s*else\s*\{\s*signingConfig signingConfigs\.debug\s*\}',
+              '',
+              result
+          )
+
+          open(path, 'w').write(result)
+          print("Patched:", path)
+          PYEOF
+
+          echo "--- Signing config result ---"
+          grep -n "signingConfig\|storeFile\|storePassword\|keyAlias\|keyPassword\|localProperties" "$FILE" || true
 
       - name: Set NDK version in library build.gradle
         run: |
-          # Replace ndk.dir approach with ndkVersion in the library module
-          # This suppresses the CXX5106 flood and uses the modern API
           FILE="TMessagesProj/build.gradle"
           if ! grep -q "ndkVersion" "$FILE"; then
             awk '
@@ -104,7 +161,7 @@ jobs:
             ' "$FILE" > tmp_build.gradle && mv tmp_build.gradle "$FILE"
           fi
 
-          echo "--- Injection result ---"
+          echo "--- API injection result ---"
           grep -n "TELEGRAM_API\|defaultConfig" "$FILE" || true
 
       - name: Configure Gradle
@@ -120,9 +177,20 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Build APK
+        env:
+          KEYSTORE_PATH: ${{ github.workspace }}/release.jks
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
+          TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
         run: |
           ./gradlew assembleRelease \
             -PabiFilters=arm64-v8a \
+            -PKEYSTORE_PATH="${{ github.workspace }}/release.jks" \
+            -PKEYSTORE_PASSWORD="${{ secrets.KEYSTORE_PASSWORD }}" \
+            -PKEY_ALIAS="${{ secrets.KEY_ALIAS }}" \
+            -PKEY_PASSWORD="${{ secrets.KEY_PASSWORD }}" \
             -x uploadSentryProguardMappingsRelease \
             -x uploadSentryNativeSymbolsForRelease \
             -x sentryBundleSourcesRelease
