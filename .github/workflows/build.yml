@@ -58,16 +58,14 @@ jobs:
           echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> local.properties
           echo "ndk.dir=$ANDROID_HOME/ndk/27.3.13750724" >> local.properties
 
-      # ✅ SIMPLE + SAFE injection (no awk/heredoc/sed issues)
+      # ✅ ULTRA SAFE injection (no multiline escaping)
       - name: Inject Telegram API into TMessagesProj
         run: |
           FILE="TMessagesProj/build.gradle"
 
           if ! grep -q TELEGRAM_API_ID "$FILE"; then
-            sed -i '/defaultConfig {/a\
-        buildConfigField "int", "TELEGRAM_API_ID", System.getenv("TELEGRAM_API_ID") ?: "0"\
-        buildConfigField "String", "TELEGRAM_API_HASH", "\"${System.getenv("TELEGRAM_API_HASH") ?: ""}\""
-            ' "$FILE"
+            sed -i '/defaultConfig {/a buildConfigField "int", "TELEGRAM_API_ID", System.getenv("TELEGRAM_API_ID") ?: "0"' "$FILE"
+            sed -i '/defaultConfig {/a buildConfigField "String", "TELEGRAM_API_HASH", "\"" + (System.getenv("TELEGRAM_API_HASH") ?: "") + "\""' "$FILE"
           fi
 
           echo "Injection check:"
