@@ -37,6 +37,7 @@ jobs:
       - name: Grant gradlew permission
         run: chmod +x gradlew
 
+      # Firebase
       - name: Restore google-services.json
         env:
           FIREBASE_JSON: ${{ secrets.FIREBASE_JSON }}
@@ -44,12 +45,14 @@ jobs:
           echo "$FIREBASE_JSON" | base64 -d > TMessagesProj_App/google-services.json
           cp TMessagesProj_App/google-services.json TMessagesProj/google-services.json
 
+      # Keystore
       - name: Restore keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
           echo "$KEYSTORE_BASE64" | base64 -d > TMessagesProj_App/release.jks
 
+      # Signing
       - name: Setup signing config
         run: |
           echo "storeFile=release.jks" >> local.properties
@@ -58,19 +61,22 @@ jobs:
           echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> local.properties
           echo "ndk.dir=$ANDROID_HOME/ndk/27.3.13750724" >> local.properties
 
-      # ✅ YAML-SAFE injection (no sed escaping issues)
+      # ✅ SAFE injection (no Groovy/YAML breakage)
       - name: Inject Telegram API into TMessagesProj
         run: |
           FILE="TMessagesProj/build.gradle"
 
           if ! grep -q TELEGRAM_API_ID "$FILE"; then
+            cat << 'EOF' > inject.gradle
+        buildConfigField "int", "TELEGRAM_API_ID", System.getenv("TELEGRAM_API_ID") ?: "0"
+        buildConfigField "String", "TELEGRAM_API_HASH", "\"" + (System.getenv("TELEGRAM_API_HASH") ?: "") + "\""
+EOF
+
             awk '
             /defaultConfig[[:space:]]*\{/ {
               print;
-              print "        def TELEGRAM_API_ID_VAL = System.getenv(\"TELEGRAM_API_ID\") ?: \"0\"";
-              print "        def TELEGRAM_API_HASH_VAL = System.getenv(\"TELEGRAM_API_HASH\") ?: \"\"";
-              print "        buildConfigField \"int\", \"TELEGRAM_API_ID\", TELEGRAM_API_ID_VAL";
-              print "        buildConfigField \"String\", \"TELEGRAM_API_HASH\", \"\\\"\" TELEGRAM_API_HASH_VAL \"\\\"\"";
+              while ((getline line < "inject.gradle") > 0) print line;
+              close("inject.gradle");
               next
             }
             { print }
@@ -78,25 +84,29 @@ jobs:
           fi
 
           echo "Injection check:"
-          grep -n TELEGRAM_API "$FILE" || true
+          grep -n TELEGRAM_API "$FILE || true
 
+      # Patch syncNumbers
       - name: Patch syncNumbers()
         run: |
           FILE="TMessagesProj/src/main/java/tw/nekomimi/nekogram/Extra.java"
           perl -0777 -i -pe 's/public static void syncNumbers\(\)\s*\{.*?\}/public static void syncNumbers() { return; }/s' "$FILE"
 
+      # Gradle tuning
       - name: Configure Gradle
         run: |
           echo "org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g" >> gradle.properties
           echo "org.gradle.parallel=true" >> gradle.properties
           echo "sentry.enabled=false" >> gradle.properties
 
+      # Version
       - name: Get app version
         id: version
         run: |
           VERSION=$(grep APP_VERSION_NAME gradle.properties | cut -d'=' -f2 | tr -d '\r\n')
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
+      # Build
       - name: Build APK
         env:
           TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
@@ -108,6 +118,7 @@ jobs:
           -x uploadSentryNativeSymbolsForRelease \
           -x sentryBundleSourcesRelease
 
+      # Locate APK
       - name: Locate APK
         id: apk
         run: |
@@ -115,6 +126,7 @@ jobs:
           echo "apk_path=$APK_PATH" >> $GITHUB_OUTPUT
           echo "Found APK: $APK_PATH"
 
+      # Release
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
