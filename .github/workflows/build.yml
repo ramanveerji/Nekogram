@@ -48,7 +48,7 @@ jobs:
       - name: Restore google-services.json
         run: |
           echo "$FIREBASE_JSON" | base64 -d > TMessagesProj/google-services.json
-      env:
+        env:
         FIREBASE_JSON: ${{ secrets.FIREBASE_JSON }}
 
       # 🧩 Create Extra.java from example
