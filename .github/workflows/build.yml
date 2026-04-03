@@ -75,11 +75,7 @@ jobs:
 
           if ! grep -q TELEGRAM_API_ID $FILE; then
             perl -0777 -i -pe '
-            s/defaultConfig\s*\{/
-defaultConfig {
-        buildConfigField "int", "TELEGRAM_API_ID", System.getenv("TELEGRAM_API_ID") ?: "0"
-        buildConfigField "String", "TELEGRAM_API_HASH", "\"\${System.getenv("TELEGRAM_API_HASH") ?: ""}\""
-/s
+            s/defaultConfig\s*\{/defaultConfig {\n        buildConfigField "int", "TELEGRAM_API_ID", System.getenv("TELEGRAM_API_ID") ?: "0"\n        buildConfigField "String", "TELEGRAM_API_HASH", "\"\${System.getenv(\"TELEGRAM_API_HASH\") ?: \"\"}\""/s
             ' $FILE
           fi
 
