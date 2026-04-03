@@ -10,8 +10,8 @@ import tw.nekomimi.nekogram.helpers.remote.ConfigHelper;
 public class Extra {
 
     // Injected via Gradle (from GitHub Secrets)
-    public static final int APP_ID = BuildConfig.TELEGRAM_API_ID;
-    public static final String APP_HASH = BuildConfig.TELEGRAM_API_HASH;
+    public static final int APP_ID = Integer.parseInt(System.getProperty("TELEGRAM_API_ID", "0"));
+    public static final String APP_HASH = System.getProperty("TELEGRAM_API_HASH", "");
 
     public static final String PLAYSTORE_APP_URL = "";
 
