@@ -21,7 +21,7 @@ jobs:
         with:
           submodules: recursive
 
-      # ☕ JDK 17
+      # ☕ JDK 21
       - name: Setup JDK
         uses: actions/setup-java@v4
         with:
@@ -44,7 +44,7 @@ jobs:
       - name: Grant gradlew permission
         run: chmod +x gradlew
 
-      # 🔐 Restore Firebase config (FROM SECRET)
+      # 🔐 Restore Firebase config
       - name: Restore google-services.json
         env:
           FIREBASE_JSON: ${{ secrets.FIREBASE_JSON }}
@@ -62,21 +62,21 @@ jobs:
       - name: Patch syncNumbers()
         run: |
           FILE="TMessagesProj/src/main/java/tw/nekomimi/nekogram/Extra.java"
-
           perl -0777 -i -pe 's/public static void syncNumbers\(\)\s*\{.*?\}/public static void syncNumbers() { return; }/s' $FILE
-
-          echo "Patch check:"
           grep -n "syncNumbers" $FILE || true
 
       # ⚙️ Set NDK path
       - name: Set NDK path
         run: echo "ndk.dir=$ANDROID_HOME/ndk/27.3.13750724" >> local.properties
 
-      # 🚀 Increase Gradle memory
-      - name: Increase Gradle memory
-        run: echo "org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g" >> gradle.properties
+      # 🚀 Gradle optimizations + disable Sentry
+      - name: Configure Gradle
+        run: |
+          echo "org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g" >> gradle.properties
+          echo "org.gradle.parallel=true" >> gradle.properties
+          echo "sentry.enabled=false" >> gradle.properties
 
-      # 🔢 Get app version from gradle.properties
+      # 🔢 Get app version
       - name: Get app version
         id: version
         run: |
@@ -84,9 +84,14 @@ jobs:
           echo "Detected version: $VERSION"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      # 📦 Build APK (arm64 only)
+      # 📦 Build APK (arm64 only + skip Sentry tasks just in case)
       - name: Build APK
-        run: ./gradlew assembleRelease -PabiFilters=arm64-v8a
+        run: |
+          ./gradlew assembleRelease \
+          -PabiFilters=arm64-v8a \
+          -x uploadSentryProguardMappingsRelease \
+          -x uploadSentryNativeSymbolsForRelease \
+          -x sentryBundleSourcesRelease
 
       # 📁 Locate APK
       - name: Locate APK
@@ -96,7 +101,7 @@ jobs:
           echo "apk_path=$APK_PATH" >> $GITHUB_OUTPUT
           echo "Found APK: $APK_PATH"
 
-      # 🚀 Create GitHub Release + upload APK
+      # 🚀 Create GitHub Release
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
@@ -106,6 +111,7 @@ jobs:
             ✔ syncNumbers() disabled
             ✔ ARM64 build
             ✔ Firebase enabled (notifications working)
+            ❌ Sentry disabled
             ⚠ unsigned APK
           files: ${{ steps.apk.outputs.apk_path }}
         env:
