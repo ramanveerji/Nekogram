@@ -46,10 +46,10 @@ jobs:
 
       # 🔐 Restore Firebase config (FROM SECRET)
       - name: Restore google-services.json
+        env:
+          FIREBASE_JSON: ${{ secrets.FIREBASE_JSON }}
         run: |
           echo "$FIREBASE_JSON" | base64 -d > TMessagesProj/google-services.json
-        env:
-        FIREBASE_JSON: ${{ secrets.FIREBASE_JSON }}
 
       # 🧩 Create Extra.java from example
       - name: Create Extra.java
