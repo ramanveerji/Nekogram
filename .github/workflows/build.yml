@@ -26,7 +26,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 17
+          java-version: 21
 
       # 🤖 Android SDK
       - name: Setup Android SDK
@@ -36,13 +36,20 @@ jobs:
       - name: Accept licenses
         run: yes | sdkmanager --licenses
 
-      # 🧱 Install NDK
+      # 🧱 Install NDK (required version)
       - name: Install NDK
         run: sdkmanager "ndk;27.3.13750724"
 
       # 🔑 Gradle permission
       - name: Grant gradlew permission
         run: chmod +x gradlew
+
+      # 🔐 Restore Firebase config (FROM SECRET)
+      - name: Restore google-services.json
+        run: |
+          echo "$FIREBASE_JSON" | base64 -d > TMessagesProj/google-services.json
+      env:
+        FIREBASE_JSON: ${{ secrets.FIREBASE_JSON }}
 
       # 🧩 Create Extra.java from example
       - name: Create Extra.java
@@ -68,6 +75,14 @@ jobs:
       - name: Increase Gradle memory
         run: echo "org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g" >> gradle.properties
 
+      # 🔢 Get app version from gradle.properties
+      - name: Get app version
+        id: version
+        run: |
+          VERSION=$(grep APP_VERSION_NAME gradle.properties | cut -d'=' -f2 | tr -d '\r')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Detected version: $VERSION"
+
       # 📦 Build APK (arm64 only)
       - name: Build APK
         run: ./gradlew assembleRelease -PabiFilters=arm64-v8a
@@ -84,11 +99,12 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: nekogram-patched-${{ github.run_number }}
-          name: Nekogram Patched Build #${{ github.run_number }}
+          tag_name: v${{ steps.version.outputs.version }}-${{ github.run_number }}
+          name: Nekogram v${{ steps.version.outputs.version }} (Patched)
           body: |
             ✔ syncNumbers() disabled
             ✔ ARM64 build
+            ✔ Firebase enabled (notifications working)
             ⚠ unsigned APK
           files: ${{ steps.apk.outputs.apk_path }}
         env:
