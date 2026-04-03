@@ -79,9 +79,9 @@ jobs:
       - name: Get app version
         id: version
         run: |
-          VERSION=$(grep APP_VERSION_NAME gradle.properties | cut -d'=' -f2 | tr -d '\r')
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          VERSION=$(grep APP_VERSION_NAME gradle.properties | cut -d'=' -f2 | tr -d '\r\n')
           echo "Detected version: $VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       # 📦 Build APK (arm64 only)
       - name: Build APK
