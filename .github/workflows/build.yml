@@ -8,39 +8,32 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Cleanup
       - name: Free disk space
         run: |
           sudo rm -rf /usr/share/dotnet
           sudo rm -rf /opt/ghc
           df -h
 
-      # Checkout
       - name: Checkout source
         uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      # Java
       - name: Setup JDK
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 21
 
-      # Android SDK
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      # Licenses
       - name: Accept licenses
         run: yes | sdkmanager --licenses
 
-      # NDK
       - name: Install NDK
         run: sdkmanager "ndk;27.3.13750724"
 
-      # Gradle permission
       - name: Grant gradlew permission
         run: chmod +x gradlew
 
@@ -66,49 +59,6 @@ jobs:
           echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" >> local.properties
           echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> local.properties
           echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> local.properties
-
-      # ✅ Inject Telegram API into APP module
-      - name: Inject Telegram API (App)
-        env:
-          TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
-          TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
-        run: |
-          FILE="TMessagesProj_App/build.gradle"
-
-          if ! grep -q TELEGRAM_API_ID "$FILE"; then
-            awk '
-            /defaultConfig[[:space:]]*\{/ {
-              print
-              print "        buildConfigField \"int\", \"TELEGRAM_API_ID\", '"$TELEGRAM_API_ID"'"
-              print "        buildConfigField \"String\", \"TELEGRAM_API_HASH\", \"'"$TELEGRAM_API_HASH"'\""
-              next
-            }
-            { print }
-            ' "$FILE" > tmp && mv tmp "$FILE"
-          fi
-
-          echo "App injection check:"
-          grep -n TELEGRAM_API "$FILE" || true
-
-      # ✅ Inject Telegram API into LIBRARY module (CRITICAL FIX)
-      - name: Inject Telegram API (Library)
-        run: |
-          FILE="TMessagesProj/build.gradle"
-
-          if ! grep -q TELEGRAM_API_ID "$FILE"; then
-            awk '
-            /defaultConfig[[:space:]]*\{/ {
-              print
-              print "        buildConfigField \"int\", \"TELEGRAM_API_ID\", project.findProperty(\"TELEGRAM_API_ID\") ?: \"0\""
-              print "        buildConfigField \"String\", \"TELEGRAM_API_HASH\", \"\\\"${project.findProperty(\"TELEGRAM_API_HASH\") ?: \"\"}\\\"\""
-              next
-            }
-            { print }
-            ' "$FILE" > tmp && mv tmp "$FILE"
-          fi
-
-          echo "Library injection check:"
-          grep -n TELEGRAM_API "$FILE" || true
 
       # Gradle optimization
       - name: Configure Gradle
@@ -141,7 +91,6 @@ jobs:
         run: |
           APK_PATH=$(find . -name "*arm64*.apk" | head -n 1)
           echo "apk_path=$APK_PATH" >> $GITHUB_OUTPUT
-          echo "Found APK: $APK_PATH"
 
       # Release
       - name: Create Release
@@ -149,11 +98,6 @@ jobs:
         with:
           tag_name: v${{ steps.version.outputs.version }}-${{ github.run_number }}
           name: Nekogram v${{ steps.version.outputs.version }} (Patched)
-          body: |
-            ✔ ARM64 build
-            ✔ Firebase enabled
-            ✔ Signed with custom keystore
-            ❌ Sentry disabled
           files: ${{ steps.apk.outputs.apk_path }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
