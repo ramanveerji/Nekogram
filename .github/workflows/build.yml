@@ -50,70 +50,9 @@ jobs:
         run: |
           echo "$KEYSTORE_BASE64" | base64 -d > "${{ github.workspace }}/release.jks"
 
-      - name: Write patch script
+      - name: Write and run patch script
         run: |
-          cat > /tmp/patch_signing.py << 'ENDOFSCRIPT'
-import re
-import sys
-
-path = sys.argv[1]
-src = open(path).read()
-
-new_signing = (
-    "    signingConfigs {\n"
-    "        sign {\n"
-    "            storeFile     file(project.findProperty('KEYSTORE_PATH') ?: '')\n"
-    "            storePassword (project.findProperty('KEYSTORE_PASSWORD') ?: '')\n"
-    "            keyAlias      (project.findProperty('KEY_ALIAS') ?: '')\n"
-    "            keyPassword   (project.findProperty('KEY_PASSWORD') ?: '')\n"
-    "        }\n"
-    "    }"
-)
-
-# Replace the entire signingConfigs { ... } block, handling nested braces
-out = []
-depth = 0
-i = 0
-start = -1
-while i < len(src):
-    if src[i:].startswith('signingConfigs') and start == -1:
-        start = i
-        depth = 0
-    if start != -1:
-        if src[i] == '{':
-            depth += 1
-        elif src[i] == '}':
-            depth -= 1
-            if depth == 0:
-                out.append(new_signing)
-                start = -1
-                i += 1
-                continue
-    else:
-        out.append(src[i])
-    i += 1
-
-result = ''.join(out)
-
-# Remove conditional guards around signingConfig in buildTypes
-result = re.sub(
-    r'if\s*\(localProperties\.getProperty\(["\']storeFile["\']\)\s*!=\s*null\)\s*\{\s*\n\s*signingConfig signingConfigs\.sign\s*\n\s*\}',
-    'signingConfig signingConfigs.sign',
-    result
-)
-# Remove else fallback to debug keystore
-result = re.sub(
-    r'\s*\}\s*else\s*\{\s*\n\s*signingConfig signingConfigs\.debug\s*\n\s*\}',
-    '',
-    result
-)
-
-open(path, 'w').write(result)
-print("Done patching: " + path)
-ENDOFSCRIPT
-
-      - name: Patch signing config
-        run: |
+          echo "aW1wb3J0IHJlCmltcG9ydCBzeXMKCnBhdGggPSBzeXMuYXJndlsxXQpzcmMgPSBvcGVuKHBhdGgpLnJlYWQoKQoKbmV3X3NpZ25pbmcgPSAoCiAgICAiICAgIHNpZ25pbmdDb25maWdzIHtcbiIKICAgICIgICAgICAgIHNpZ24ge1xuIgogICAgIiAgICAgICAgICAgIHN0b3JlRmlsZSAgICAgZmlsZShwcm9qZWN0LmZpbmRQcm9wZXJ0eShcIktFWVNUT1JFX1BBVEhcIikgPzogXCJcIilcbiIKICAgICIgICAgICAgICAgICBzdG9yZVBhc3N3b3JkIChwcm9qZWN0LmZpbmRQcm9wZXJ0eShcIktFWVNUT1JFX1BBU1NXT1JEXCIpID86IFwiXCIpXG4iCiAgICAiICAgICAgICAgICAga2V5QWxpYXMgICAgICAocHJvamVjdC5maW5kUHJvcGVydHkoXCJLRVlfQUxJQVNcIikgPzogXCJcIilcbiIKICAgICIgICAgICAgICAgICBrZXlQYXNzd29yZCAgIChwcm9qZWN0LmZpbmRQcm9wZXJ0eShcIktFWV9QQVNTV09SRFwiKSA/OiBcIlwiKVxuIgogICAgIiAgICAgICAgfVxuIgogICAgIiAgICB9IgopCgpvdXQgPSBbXQpkZXB0aCA9IDAKaSA9IDAKc3RhcnQgPSAtMQp3aGlsZSBpIDwgbGVuKHNyYyk6CiAgICBpZiBzcmNbaTpdLnN0YXJ0c3dpdGgoInNpZ25pbmdDb25maWdzIikgYW5kIHN0YXJ0ID09IC0xOgogICAgICAgIHN0YXJ0ID0gaQogICAgICAgIGRlcHRoID0gMAogICAgaWYgc3RhcnQgIT0gLTE6CiAgICAgICAgaWYgc3JjW2ldID09ICJ7IjoKICAgICAgICAgICAgZGVwdGggKz0gMQogICAgICAgIGVsaWYgc3JjW2ldID09ICJ9IjoKICAgICAgICAgICAgZGVwdGggLT0gMQogICAgICAgICAgICBpZiBkZXB0aCA9PSAwOgogICAgICAgICAgICAgICAgb3V0LmFwcGVuZChuZXdfc2lnbmluZykKICAgICAgICAgICAgICAgIHN0YXJ0ID0gLTEKICAgICAgICAgICAgICAgIGkgKz0gMQogICAgICAgICAgICAgICAgY29udGludWUKICAgIGVsc2U6CiAgICAgICAgb3V0LmFwcGVuZChzcmNbaV0pCiAgICBpICs9IDEKCnJlc3VsdCA9ICIiLmpvaW4ob3V0KQoKcmVzdWx0ID0gcmUuc3ViKAogICAgcidpZlxzKlwobG9jYWxQcm9wZXJ0aWVzXC5nZXRQcm9wZXJ0eVwoWyJcJ11zdG9yZUZpbGVbIlwnXVwpXHMqIT1ccypudWxsXClccypce1xzKlxuXHMqc2lnbmluZ0NvbmZpZyBzaWduaW5nQ29uZmlnc1wuc2lnblxzKlxuXHMqXH0nLAogICAgInNpZ25pbmdDb25maWcgc2lnbmluZ0NvbmZpZ3Muc2lnbiIsCiAgICByZXN1bHQKKQpyZXN1bHQgPSByZS5zdWIoCiAgICByJ1xzKlx9XHMqZWxzZVxzKlx7XHMqXG5ccypzaWduaW5nQ29uZmlnIHNpZ25pbmdDb25maWdzXC5kZWJ1Z1xzKlxuXHMqXH0nLAogICAgIiIsCiAgICByZXN1bHQKKQoKb3BlbihwYXRoLCAidyIpLndyaXRlKHJlc3VsdCkKcHJpbnQoIkRvbmUgcGF0Y2hpbmc6ICIgKyBwYXRoKQo=" | base64 -d > /tmp/patch_signing.py
           python3 /tmp/patch_signing.py TMessagesProj_App/build.gradle
           echo "--- Signing config result ---"
           grep -n "signingConfig\|storeFile\|storePassword\|keyAlias\|keyPassword\|localProperties" TMessagesProj_App/build.gradle || true
