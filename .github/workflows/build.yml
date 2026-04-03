@@ -50,76 +50,73 @@ jobs:
         run: |
           echo "$KEYSTORE_BASE64" | base64 -d > "${{ github.workspace }}/release.jks"
 
-      # Patch TMessagesProj_App/build.gradle signing block to read from
-      # Gradle project properties (-P flags) instead of local.properties.
-      # This avoids the Groovy evaluation-order bug where localProperties is
-      # null when signingConfigs {} is evaluated.
-      - name: Patch signing config to use project properties
+      - name: Write patch script
         run: |
-          FILE="TMessagesProj_App/build.gradle"
+          cat > /tmp/patch_signing.py << 'ENDOFSCRIPT'
+import re
+import sys
 
-          # Replace the entire signingConfigs block with one that reads
-          # from project properties passed via -P on the command line.
-          # We use a Python heredoc to avoid any shell quoting hell with awk/sed.
-          python3 - "$FILE" << 'PYEOF'
-          import re, sys
+path = sys.argv[1]
+src = open(path).read()
 
-          path = sys.argv[1]
-          src  = open(path).read()
+new_signing = (
+    "    signingConfigs {\n"
+    "        sign {\n"
+    "            storeFile     file(project.findProperty('KEYSTORE_PATH') ?: '')\n"
+    "            storePassword (project.findProperty('KEYSTORE_PASSWORD') ?: '')\n"
+    "            keyAlias      (project.findProperty('KEY_ALIAS') ?: '')\n"
+    "            keyPassword   (project.findProperty('KEY_PASSWORD') ?: '')\n"
+    "        }\n"
+    "    }"
+)
 
-          new_signing = '''\
-      signingConfigs {
-          sign {
-              storeFile     file(project.findProperty("KEYSTORE_PATH") ?: "")
-              storePassword (project.findProperty("KEYSTORE_PASSWORD") ?: "")
-              keyAlias      (project.findProperty("KEY_ALIAS")         ?: "")
-              keyPassword   (project.findProperty("KEY_PASSWORD")      ?: "")
-          }
-      }'''
+# Replace the entire signingConfigs { ... } block, handling nested braces
+out = []
+depth = 0
+i = 0
+start = -1
+while i < len(src):
+    if src[i:].startswith('signingConfigs') and start == -1:
+        start = i
+        depth = 0
+    if start != -1:
+        if src[i] == '{':
+            depth += 1
+        elif src[i] == '}':
+            depth -= 1
+            if depth == 0:
+                out.append(new_signing)
+                start = -1
+                i += 1
+                continue
+    else:
+        out.append(src[i])
+    i += 1
 
-          # Replace the old signingConfigs { ... } block (handles nested braces)
-          out, depth, i, start = [], 0, 0, -1
-          while i < len(src):
-              if src[i:].startswith('signingConfigs') and start == -1:
-                  start = i
-                  depth = 0
-              if start != -1:
-                  if src[i] == '{':
-                      depth += 1
-                  elif src[i] == '}':
-                      depth -= 1
-                      if depth == 0:
-                          out.append(new_signing)
-                          start = -1
-                          i += 1
-                          continue
-              else:
-                  out.append(src[i])
-              i += 1
+result = ''.join(out)
 
-          result = ''.join(out)
+# Remove conditional guards around signingConfig in buildTypes
+result = re.sub(
+    r'if\s*\(localProperties\.getProperty\(["\']storeFile["\']\)\s*!=\s*null\)\s*\{\s*\n\s*signingConfig signingConfigs\.sign\s*\n\s*\}',
+    'signingConfig signingConfigs.sign',
+    result
+)
+# Remove else fallback to debug keystore
+result = re.sub(
+    r'\s*\}\s*else\s*\{\s*\n\s*signingConfig signingConfigs\.debug\s*\n\s*\}',
+    '',
+    result
+)
 
-          # Also fix the two buildTypes references that conditionally pick signingConfig:
-          # replace both `if (localProperties...) { signingConfig signingConfigs.sign }` guards
-          # with unconditional `signingConfig signingConfigs.sign`
-          result = re.sub(
-              r'if\s*\(localProperties\.getProperty\(["\']storeFile["\']\)\s*!=\s*null\)\s*\{\s*signingConfig signingConfigs\.sign\s*\}',
-              'signingConfig signingConfigs.sign',
-              result
-          )
-          # Remove the fallback `else { signingConfig signingConfigs.debug }` if present
-          result = re.sub(
-              r'\}\s*else\s*\{\s*signingConfig signingConfigs\.debug\s*\}',
-              '',
-              result
-          )
+open(path, 'w').write(result)
+print("Done patching: " + path)
+ENDOFSCRIPT
 
-          open(path, 'w').write(result)
-          print("Patched:", path)
-          PYEOF
-
+      - name: Patch signing config
+        run: |
+          python3 /tmp/patch_signing.py TMessagesProj_App/build.gradle
           echo "--- Signing config result ---"
-          grep -n "signingConfig\|storeFile\|storePassword\|keyAlias\|keyPassword\|localProperties" "$FILE" || true
+          grep -n "signingConfig\|storeFile\|storePassword\|keyAlias\|keyPassword\|localProperties" TMessagesProj_App/build.gradle || true
 
       - name: Set NDK version in library build.gradle
         run: |
@@ -177,13 +174,6 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Build APK
-        env:
-          KEYSTORE_PATH: ${{ github.workspace }}/release.jks
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-          TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
-          TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
         run: |
           ./gradlew assembleRelease \
             -PabiFilters=arm64-v8a \
