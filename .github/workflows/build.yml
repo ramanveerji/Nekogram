@@ -62,7 +62,7 @@ jobs:
       # Signing config (FIXED PATH ✅)
       - name: Setup signing config
         run: |
-          echo "storeFile=TMessagesProj_App/release.jks" >> local.properties
+          echo "storeFile=release.jks" >> local.properties
           echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" >> local.properties
           echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> local.properties
           echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> local.properties
