@@ -50,12 +50,16 @@ jobs:
         run: |
           echo "$KEYSTORE_BASE64" | base64 -d > "${{ github.workspace }}/release.jks"
 
-      - name: Patch signing config
+      # Overwrite TMessagesProj_App/build.gradle entirely with a clean version.
+      # This avoids all patching/regex fragility. The file is pre-baked with:
+      #   - signingConfigs reading from -P Gradle project properties
+      #   - buildConfigField for Telegram API reading from -P project properties
+      #   - No localProperties references at all
+      - name: Replace app build.gradle with clean version
         run: |
-          echo "aW1wb3J0IHJlLCBzeXMKCnBhdGggPSBzeXMuYXJndlsxXQpzcmMgPSBvcGVuKHBhdGgpLnJlYWQoKQoKIyAtLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0KIyBIZWxwZXI6IGV4dHJhY3QgYSB0b3AtbGV2ZWwgYmxvY2sgYnkga2V5d29yZCwgcmV0dXJuIChzdGFydCwgZW5kKQojIHdoZXJlIHNyY1tzdGFydDplbmQrMV0gaXMgdGhlIGZ1bGwgImtleXdvcmQgeyAuLi4gfSIgdGV4dAojIC0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLQpkZWYgZmluZF9ibG9jayh0ZXh0LCBrZXl3b3JkKToKICAgIHBhdCA9IHJlLmNvbXBpbGUocidcYicgKyByZS5lc2NhcGUoa2V5d29yZCkgKyByJ1xzKlx7JykKICAgIG0gPSBwYXQuc2VhcmNoKHRleHQpCiAgICBpZiBub3QgbToKICAgICAgICByZXR1cm4gTm9uZSwgTm9uZSwgTm9uZQogICAgYnJhY2VfcG9zID0gdGV4dC5pbmRleCgneycsIG0uc3RhcnQoKSkKICAgIGRlcHRoID0gMAogICAgZm9yIGkgaW4gcmFuZ2UoYnJhY2VfcG9zLCBsZW4odGV4dCkpOgogICAgICAgIGlmIHRleHRbaV0gPT0gJ3snOiBkZXB0aCArPSAxCiAgICAgICAgZWxpZiB0ZXh0W2ldID09ICd9JzoKICAgICAgICAgICAgZGVwdGggLT0gMQogICAgICAgICAgICBpZiBkZXB0aCA9PSAwOgogICAgICAgICAgICAgICAgcmV0dXJuIG0uc3RhcnQoKSwgaSwgbQogICAgcmV0dXJuIE5vbmUsIE5vbmUsIE5vbmUKCiMgLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tCiMgMS4gUmVtb3ZlIGxvY2FsUHJvcGVydGllcyBsb2FkaW5nIGxpbmVzICgzLWxpbmUgYmxvY2spCiMgLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tCnNyYyA9IHJlLnN1YigKICAgIHInWyBcdF0qUHJvcGVydGllcyBsb2NhbFByb3BlcnRpZXMgPSBuZXcgUHJvcGVydGllc1woXClbIFx0XSpcbicKICAgIHInWyBcdF0qaWYgXChwcm9qZWN0XC5yb290UHJvamVjdFwuZmlsZVwoLio/XClcLmV4aXN0c1woXClcKSBce1sgXHRdKlxuJwogICAgcidbIFx0XSpsb2NhbFByb3BlcnRpZXNcLmxvYWRcKC4qP1wpWyBcdF0qXG4nCiAgICByJ1sgXHRdKlx9WyBcdF0qXG4nLAogICAgJycsCiAgICBzcmMKKQoKIyAtLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0KIyAyLiBSZXBsYWNlIHNpZ25pbmdDb25maWdzIGJsb2NrIGVudGlyZWx5CiMgLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tCm5ld19zaWduaW5nID0gKAogICAgJyAgICBzaWduaW5nQ29uZmlncyB7XG4nCiAgICAnICAgICAgICBzaWduIHtcbicKICAgICcgICAgICAgICAgICBzdG9yZUZpbGUgICAgIGZpbGUocHJvamVjdC5maW5kUHJvcGVydHkoIktFWVNUT1JFX1BBVEgiKSA/OiAiIilcbicKICAgICcgICAgICAgICAgICBzdG9yZVBhc3N3b3JkIChwcm9qZWN0LmZpbmRQcm9wZXJ0eSgiS0VZU1RPUkVfUEFTU1dPUkQiKSA/OiAiIilcbicKICAgICcgICAgICAgICAgICBrZXlBbGlhcyAgICAgIChwcm9qZWN0LmZpbmRQcm9wZXJ0eSgiS0VZX0FMSUFTIikgPzogIiIpXG4nCiAgICAnICAgICAgICAgICAga2V5UGFzc3dvcmQgICAocHJvamVjdC5maW5kUHJvcGVydHkoIktFWV9QQVNTV09SRCIpID86ICIiKVxuJwogICAgJyAgICAgICAgfVxuJwogICAgJyAgICB9JwopCnN0YXJ0LCBlbmQsIF8gPSBmaW5kX2Jsb2NrKHNyYywgJ3NpZ25pbmdDb25maWdzJykKaWYgc3RhcnQgaXMgTm9uZToKICAgIHByaW50KCJFUlJPUjogc2lnbmluZ0NvbmZpZ3Mgbm90IGZvdW5kIik7IHN5cy5leGl0KDEpCnNyYyA9IHNyY1s6c3RhcnRdICsgbmV3X3NpZ25pbmcgKyBzcmNbZW5kKzE6XQoKIyAtLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0KIyAzLiBSZXBsYWNlIHRoZSBlbnRpcmUgYnVpbGRUeXBlcyBibG9jayB3aXRoIGEgY2xlYW4gdmVyc2lvbgojICAgIHRoYXQgaGFzIHVuY29uZGl0aW9uYWwgc2lnbmluZ0NvbmZpZyByZWZlcmVuY2VzCiMgLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tCm5ld19idWlsZHR5cGVzID0gKAogICAgJyAgICBidWlsZFR5cGVzIHtcbicKICAgICcgICAgICAgIGRlYnVnIHtcbicKICAgICcgICAgICAgICAgICBzaWduaW5nQ29uZmlnIHNpZ25pbmdDb25maWdzLnNpZ25cbicKICAgICcgICAgICAgICAgICBhcHBsaWNhdGlvbklkU3VmZml4ICIuYmV0YSJcbicKICAgICcgICAgICAgIH1cbicKICAgICdcbicKICAgICcgICAgICAgIHJlbGVhc2Uge1xuJwogICAgJyAgICAgICAgICAgIG1pbmlmeUVuYWJsZWQgdHJ1ZVxuJwogICAgJyAgICAgICAgICAgIHNocmlua1Jlc291cmNlcyB0cnVlXG4nCiAgICAnICAgICAgICAgICAgdmNzSW5mby5pbmNsdWRlIGZhbHNlXG4nCiAgICAnICAgICAgICAgICAgc2lnbmluZ0NvbmZpZyBzaWduaW5nQ29uZmlncy5zaWduXG4nCiAgICAiICAgICAgICAgICAgcHJvZ3VhcmRGaWxlcyAnLi4vVE1lc3NhZ2VzUHJvai9wcm9ndWFyZC1ydWxlcy5wcm8nXG4iCiAgICAiICAgICAgICAgICAgbmRrLmRlYnVnU3ltYm9sTGV2ZWwgJ0ZVTEwnXG4iCiAgICAnICAgICAgICB9XG4nCiAgICAnICAgIH0nCikKc3RhcnQsIGVuZCwgXyA9IGZpbmRfYmxvY2soc3JjLCAnYnVpbGRUeXBlcycpCmlmIHN0YXJ0IGlzIE5vbmU6CiAgICBwcmludCgiRVJST1I6IGJ1aWxkVHlwZXMgbm90IGZvdW5kIik7IHN5cy5leGl0KDEpCnNyYyA9IHNyY1s6c3RhcnRdICsgbmV3X2J1aWxkdHlwZXMgKyBzcmNbZW5kKzE6XQoKb3BlbihwYXRoLCAndycpLndyaXRlKHNyYykKcHJpbnQoIlBhdGNoZWQgc3VjY2Vzc2Z1bGx5OiAiICsgcGF0aCkK" | base64 -d > /tmp/patch_signing.py
-          python3 /tmp/patch_signing.py TMessagesProj_App/build.gradle
-          echo "--- Result ---"
-          grep -n "signingConfig\|storeFile\|storePassword\|localProperties\|buildTypes\|signingConfigs" TMessagesProj_App/build.gradle
+          echo "aW1wb3J0IGNvbS5hbmRyb2lkLmJ1aWxkLmFwaS52YXJpYW50LkZpbHRlckNvbmZpZ3VyYXRpb24KCnBsdWdpbnMgewogICAgaWQgJ2NvbS5hbmRyb2lkLmFwcGxpY2F0aW9uJwogICAgaWQgJ2NvbS5nb29nbGUuZ21zLmdvb2dsZS1zZXJ2aWNlcycKICAgIGlkICdpby5zZW50cnkuYW5kcm9pZC5ncmFkbGUnCn0KCmRlcGVuZGVuY2llcyB7CiAgICBpbXBsZW1lbnRhdGlvbiBwcm9qZWN0KCc6VE1lc3NhZ2VzUHJvaicpCn0KCnNlbnRyeSB7CiAgICB1cGxvYWROYXRpdmVTeW1ib2xzID0gdHJ1ZQogICAgaW5jbHVkZVNvdXJjZUNvbnRleHQgPSB0cnVlCiAgICBhZGRpdGlvbmFsU291cmNlRGlyc0ZvclNvdXJjZUNvbnRleHQgPSBbICcuLi9UTWVzc2FnZXNQcm9qL3NyYy9tYWluL2phdmEnIF0KICAgIGF1dG9JbnN0YWxsYXRpb24gewogICAgICAgIGVuYWJsZWQgPSBmYWxzZQogICAgfQogICAgaWdub3JlZEJ1aWxkVHlwZXMgPSBbImRlYnVnIl0KfQoKYW5kcm9pZCB7CiAgICBkZWZhdWx0Q29uZmlnLmFwcGxpY2F0aW9uSWQgPSBBUFBfUEFDS0FHRQoKICAgIHBhY2thZ2luZ09wdGlvbnMgewogICAgICAgIHJlc291cmNlcyB7CiAgICAgICAgICAgIGV4Y2x1ZGVzICs9ICcqKicKICAgICAgICB9CiAgICB9CgogICAgc2lnbmluZ0NvbmZpZ3MgewogICAgICAgIHNpZ24gewogICAgICAgICAgICBzdG9yZUZpbGUgICAgIGZpbGUocHJvamVjdC5maW5kUHJvcGVydHkoIktFWVNUT1JFX1BBVEgiKSA/OiAiIikKICAgICAgICAgICAgc3RvcmVQYXNzd29yZCAocHJvamVjdC5maW5kUHJvcGVydHkoIktFWVNUT1JFX1BBU1NXT1JEIikgPzogIiIpCiAgICAgICAgICAgIGtleUFsaWFzICAgICAgKHByb2plY3QuZmluZFByb3BlcnR5KCJLRVlfQUxJQVMiKSA/OiAiIikKICAgICAgICAgICAga2V5UGFzc3dvcmQgICAocHJvamVjdC5maW5kUHJvcGVydHkoIktFWV9QQVNTV09SRCIpID86ICIiKQogICAgICAgIH0KICAgIH0KCiAgICBidWlsZFR5cGVzIHsKICAgICAgICBkZWJ1ZyB7CiAgICAgICAgICAgIHNpZ25pbmdDb25maWcgc2lnbmluZ0NvbmZpZ3Muc2lnbgogICAgICAgICAgICBhcHBsaWNhdGlvbklkU3VmZml4ICIuYmV0YSIKICAgICAgICB9CgogICAgICAgIHJlbGVhc2UgewogICAgICAgICAgICBtaW5pZnlFbmFibGVkIHRydWUKICAgICAgICAgICAgc2hyaW5rUmVzb3VyY2VzIHRydWUKICAgICAgICAgICAgdmNzSW5mby5pbmNsdWRlIGZhbHNlCiAgICAgICAgICAgIHNpZ25pbmdDb25maWcgc2lnbmluZ0NvbmZpZ3Muc2lnbgogICAgICAgICAgICBwcm9ndWFyZEZpbGVzICcuLi9UTWVzc2FnZXNQcm9qL3Byb2d1YXJkLXJ1bGVzLnBybycKICAgICAgICAgICAgbmRrLmRlYnVnU3ltYm9sTGV2ZWwgJ0ZVTEwnCiAgICAgICAgfQogICAgfQoKICAgIGRlZmF1bHRDb25maWcudmVyc2lvbkNvZGUgPSBJbnRlZ2VyLnBhcnNlSW50KEFQUF9WRVJTSU9OX0NPREUpCgogICAgZGVmYXVsdENvbmZpZyB7CiAgICAgICAgdmVyc2lvbk5hbWUgQVBQX1ZFUlNJT05fTkFNRQogICAgICAgIG11bHRpRGV4RW5hYmxlZCB0cnVlCiAgICAgICAgYnVpbGRDb25maWdGaWVsZCAiaW50IiwgIlRFTEVHUkFNX0FQSV9JRCIsIHByb2plY3QuZmluZFByb3BlcnR5KCJURUxFR1JBTV9BUElfSUQiKSA/OiAiMCIKICAgICAgICBidWlsZENvbmZpZ0ZpZWxkICJTdHJpbmciLCAiVEVMRUdSQU1fQVBJX0hBU0giLCAiXCIke3Byb2plY3QuZmluZFByb3BlcnR5KCdURUxFR1JBTV9BUElfSEFTSCcpID86ICcnfVwiIgogICAgfQoKICAgIGJ1bmRsZSB7CiAgICAgICAgbGFuZ3VhZ2UgewogICAgICAgICAgICBlbmFibGVTcGxpdCA9IGZhbHNlCiAgICAgICAgfQogICAgfQoKICAgIHNwbGl0cy5hYmkgewogICAgICAgIHZhciBidWlsZGluZ0J1bmRsZSA9IGdyYWRsZS5zdGFydFBhcmFtZXRlci50YXNrTmFtZXMuYW55IHsgaXQuc3RhcnRzV2l0aCgiYnVuZGxlIikgfQogICAgICAgIGVuYWJsZSAhYnVpbGRpbmdCdW5kbGUKICAgICAgICB1bml2ZXJzYWxBcGsgdHJ1ZQoKICAgICAgICByZXNldCgpCiAgICAgICAgaW5jbHVkZSAiYXJtZWFiaS12N2EiLCAiYXJtNjQtdjhhIiwgIng4NiIsICJ4ODZfNjQiCiAgICB9CiAgICBuYW1lc3BhY2UgJ29yZy50ZWxlZ3JhbS5tZXNzZW5nZXIucmVndWxhcicKCiAgICBkZXBlbmRlbmNpZXNJbmZvIHsKICAgICAgICBpbmNsdWRlSW5BcGsgZmFsc2UKICAgICAgICBpbmNsdWRlSW5CdW5kbGUgZmFsc2UKICAgIH0KfQoKYW5kcm9pZENvbXBvbmVudHMgewogICAgb25WYXJpYW50cyhzZWxlY3RvcigpLmFsbCgpKSB7IHZhcmlhbnQgLT4KICAgICAgICB2YXJpYW50Lm91dHB1dHMuZWFjaCB7IG91dHB1dCAtPgogICAgICAgICAgICBkZWYgYWJpID0gb3V0cHV0LmZpbHRlcnMuZmluZCB7IGl0LmZpbHRlclR5cGUgPT0gRmlsdGVyQ29uZmlndXJhdGlvbi5GaWx0ZXJUeXBlLkFCSSB9Py5pZGVudGlmaWVyCiAgICAgICAgICAgIGRlZiBhYmlOYW1lID0gYWJpID86ICJ1bml2ZXJzYWwiCiAgICAgICAgICAgIGRlZiBiYXNlVmVyc2lvbkNvZGUgPSBvdXRwdXQudmVyc2lvbkNvZGUuZ2V0KCkKICAgICAgICAgICAgb3V0cHV0Lm91dHB1dEZpbGVOYW1lLnNldCgiTmVrb2dyYW0tJHtvdXRwdXQudmVyc2lvbk5hbWUuZ2V0KCl9LSR7YmFzZVZlcnNpb25Db2RlfS0ke2FiaU5hbWV9LmFwayIpCiAgICAgICAgICAgIG91dHB1dC52ZXJzaW9uQ29kZS5zZXQoYmFzZVZlcnNpb25Db2RlICogMTApCiAgICAgICAgfQogICAgfQp9Cg==" | base64 -d > TMessagesProj_App/build.gradle
+          echo "--- Verification ---"
+          cat -n TMessagesProj_App/build.gradle
 
       - name: Set NDK version in library build.gradle
         run: |
@@ -71,34 +75,6 @@ jobs:
               { print }
             ' "$FILE" > tmp && mv tmp "$FILE"
           fi
-
-      - name: Inject Telegram API into app build.gradle
-        env:
-          TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
-          TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
-        run: |
-          FILE="TMessagesProj_App/build.gradle"
-
-          if grep -q "TELEGRAM_API_ID" "$FILE"; then
-            echo "Already injected, skipping."
-          else
-            LINE1="        buildConfigField \"int\", \"TELEGRAM_API_ID\", \"${TELEGRAM_API_ID}\""
-            LINE2="        buildConfigField \"String\", \"TELEGRAM_API_HASH\", \"\\\"${TELEGRAM_API_HASH}\\\"\""
-
-            awk -v l1="$LINE1" -v l2="$LINE2" '
-              !injected && /defaultConfig[[:space:]]*\{/ {
-                print
-                print l1
-                print l2
-                injected=1
-                next
-              }
-              { print }
-            ' "$FILE" > tmp_build.gradle && mv tmp_build.gradle "$FILE"
-          fi
-
-          echo "--- API injection result ---"
-          grep -n "TELEGRAM_API\|defaultConfig" "$FILE" || true
 
       - name: Configure Gradle
         run: |
@@ -120,6 +96,8 @@ jobs:
             -PKEYSTORE_PASSWORD="${{ secrets.KEYSTORE_PASSWORD }}" \
             -PKEY_ALIAS="${{ secrets.KEY_ALIAS }}" \
             -PKEY_PASSWORD="${{ secrets.KEY_PASSWORD }}" \
+            -PTELEGRAM_API_ID="${{ secrets.TELEGRAM_API_ID }}" \
+            -PTELEGRAM_API_HASH="${{ secrets.TELEGRAM_API_HASH }}" \
             -x uploadSentryProguardMappingsRelease \
             -x uploadSentryNativeSymbolsForRelease \
             -x sentryBundleSourcesRelease
