@@ -71,11 +71,6 @@ jobs:
           echo "Injection check:"
           grep -n TELEGRAM_API "$FILE" || true
 
-      - name: Patch syncNumbers()
-        run: |
-          FILE="TMessagesProj/src/main/java/tw/nekomimi/nekogram/Extra.java"
-          perl -0777 -i -pe 's/public static void syncNumbers\(\)\s*\{.*?\}/public static void syncNumbers() { return; }/s' "$FILE"
-
       - name: Configure Gradle
         run: |
           echo "org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g" >> gradle.properties
