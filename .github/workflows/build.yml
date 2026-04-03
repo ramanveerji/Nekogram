@@ -49,7 +49,8 @@ jobs:
         env:
           FIREBASE_JSON: ${{ secrets.FIREBASE_JSON }}
         run: |
-          echo "$FIREBASE_JSON" | base64 -d > TMessagesProj/google-services.json
+          echo "$FIREBASE_JSON" | base64 -d > TMessagesProj_App/google-services.json
+          cp TMessagesProj_App/google-services.json TMessagesProj/google-services.json
 
       # 🧩 Create Extra.java from example
       - name: Create Extra.java
