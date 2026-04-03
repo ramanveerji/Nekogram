@@ -38,7 +38,7 @@ jobs:
 
       # 🧱 Install NDK
       - name: Install NDK
-        run: sdkmanager "ndk;25.2.9519653"
+        run: sdkmanager "ndk;27.3.13750724"
 
       # 🔑 Gradle permission
       - name: Grant gradlew permission
@@ -62,7 +62,7 @@ jobs:
 
       # ⚙️ Set NDK path
       - name: Set NDK path
-        run: echo "ndk.dir=$ANDROID_HOME/ndk/25.2.9519653" >> local.properties
+        run: echo "ndk.dir=$ANDROID_HOME/ndk/27.3.13750724" >> local.properties
 
       # 🚀 Increase Gradle memory
       - name: Increase Gradle memory
