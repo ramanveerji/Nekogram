@@ -58,30 +58,43 @@ jobs:
           echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> local.properties
           echo "ndk.dir=$ANDROID_HOME/ndk/27.3.13750724" >> local.properties
 
-      # ✅ SAFE injection (NO sed, NO escaping issues)
-      - name: Inject Telegram API
+      # Inject API credentials into the APP module's build.gradle (not the library)
+      # Targets TMessagesProj_App/build.gradle where defaultConfig generates BuildConfig
+      - name: Inject Telegram API into app build.gradle
         env:
           TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
           TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
         run: |
-          FILE="TMessagesProj/build.gradle"
+          FILE="TMessagesProj_App/build.gradle"
 
-          if ! grep -q TELEGRAM_API_ID "$FILE"; then
-            echo 'buildConfigField "int", "TELEGRAM_API_ID", '"$TELEGRAM_API_ID" > inject.tmp
-            echo 'buildConfigField "String", "TELEGRAM_API_HASH", "'"$TELEGRAM_API_HASH"'"' >> inject.tmp
+          # Safety check — don't double-inject on re-runs
+          if grep -q "TELEGRAM_API_ID" "$FILE"; then
+            echo "Already injected, skipping."
+          else
+            # Build the two lines to inject (Gradle buildConfigField syntax):
+            # int fields still need the value as a quoted string literal in Groovy DSL
+            LINE1="        buildConfigField \"int\", \"TELEGRAM_API_ID\", \"${TELEGRAM_API_ID}\""
+            LINE2="        buildConfigField \"String\", \"TELEGRAM_API_HASH\", \"\\\"${TELEGRAM_API_HASH}\\\"\""
 
-            awk '
-            /defaultConfig[[:space:]]*\{/ {
-              print
-              while ((getline line < "inject.tmp") > 0) print "        " line
-              next
-            }
-            { print }
-            ' "$FILE" > tmp && mv tmp "$FILE"
+            # Find the FIRST defaultConfig block (the top-level one, not the nested ones)
+            # and inject after its opening brace.
+            # The app build.gradle has: defaultConfig.applicationId and defaultConfig.versionCode
+            # as standalone lines, plus a defaultConfig { versionName ... } block.
+            # We target the `defaultConfig {` block (the one with a brace on the same line).
+            awk -v l1="$LINE1" -v l2="$LINE2" '
+              !injected && /defaultConfig[[:space:]]*\{/ {
+                print
+                print l1
+                print l2
+                injected=1
+                next
+              }
+              { print }
+            ' "$FILE" > tmp_build.gradle && mv tmp_build.gradle "$FILE"
           fi
 
-          echo "Injection check:"
-          grep -n TELEGRAM_API "$FILE" || true
+          echo "--- Injection result ---"
+          grep -n "TELEGRAM_API\|defaultConfig" "$FILE" || true
 
       - name: Configure Gradle
         run: |
@@ -98,10 +111,10 @@ jobs:
       - name: Build APK
         run: |
           ./gradlew assembleRelease \
-          -PabiFilters=arm64-v8a \
-          -x uploadSentryProguardMappingsRelease \
-          -x uploadSentryNativeSymbolsForRelease \
-          -x sentryBundleSourcesRelease
+            -PabiFilters=arm64-v8a \
+            -x uploadSentryProguardMappingsRelease \
+            -x uploadSentryNativeSymbolsForRelease \
+            -x sentryBundleSourcesRelease
 
       - name: Locate APK
         id: apk
