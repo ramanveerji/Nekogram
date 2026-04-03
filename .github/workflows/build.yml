@@ -1,0 +1,95 @@
+name: Build & Release Patched Nekogram ARM64
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 🧹 Free disk space
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          df -h
+
+      # 📥 Checkout with submodules
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      # ☕ JDK 17
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      # 🤖 Android SDK
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      # 📜 Accept licenses
+      - name: Accept licenses
+        run: yes | sdkmanager --licenses
+
+      # 🧱 Install NDK
+      - name: Install NDK
+        run: sdkmanager "ndk;25.2.9519653"
+
+      # 🔑 Gradle permission
+      - name: Grant gradlew permission
+        run: chmod +x gradlew
+
+      # 🧩 Create Extra.java from example
+      - name: Create Extra.java
+        run: |
+          cp TMessagesProj/src/main/java/tw/nekomimi/nekogram/Extra.java.example \
+             TMessagesProj/src/main/java/tw/nekomimi/nekogram/Extra.java
+
+      # 🛡️ Patch syncNumbers()
+      - name: Patch syncNumbers()
+        run: |
+          FILE="TMessagesProj/src/main/java/tw/nekomimi/nekogram/Extra.java"
+
+          perl -0777 -i -pe 's/public static void syncNumbers\(\)\s*\{.*?\}/public static void syncNumbers() { return; }/s' $FILE
+
+          echo "Patched successfully:"
+          grep -n "syncNumbers" $FILE
+
+      # ⚙️ Set NDK path
+      - name: Set NDK path
+        run: echo "ndk.dir=$ANDROID_HOME/ndk/25.2.9519653" >> local.properties
+
+      # 🚀 Increase Gradle memory
+      - name: Increase Gradle memory
+        run: echo "org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g" >> gradle.properties
+
+      # 📦 Build APK (arm64 only)
+      - name: Build APK
+        run: ./gradlew assembleRelease -PabiFilters=arm64-v8a
+
+      # 📁 Locate APK
+      - name: Locate APK
+        id: apk
+        run: |
+          APK_PATH=$(find . -name "*arm64*.apk" | head -n 1)
+          echo "apk_path=$APK_PATH" >> $GITHUB_OUTPUT
+          echo "Found APK: $APK_PATH"
+
+      # 🚀 Create GitHub Release + upload APK
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: nekogram-patched-${{ github.run_number }}
+          name: Nekogram Patched Build #${{ github.run_number }}
+          body: |
+            ✔ syncNumbers() disabled
+            ✔ ARM64 build
+            ⚠ unsigned APK
+          files: ${{ steps.apk.outputs.apk_path }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
