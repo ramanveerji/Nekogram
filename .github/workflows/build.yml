@@ -15,7 +15,7 @@ jobs:
           sudo rm -rf /opt/ghc
           df -h
 
-      # 📥 Checkout with submodules
+      # 📥 Checkout
       - name: Checkout source
         uses: actions/checkout@v4
         with:
@@ -32,11 +32,11 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      # 📜 Accept licenses
+      # 📜 Licenses
       - name: Accept licenses
         run: yes | sdkmanager --licenses
 
-      # 🧱 Install NDK (required version)
+      # 🧱 NDK
       - name: Install NDK
         run: sdkmanager "ndk;27.3.13750724"
 
@@ -52,40 +52,65 @@ jobs:
           echo "$FIREBASE_JSON" | base64 -d > TMessagesProj_App/google-services.json
           cp TMessagesProj_App/google-services.json TMessagesProj/google-services.json
 
-      # 🧩 Create Extra.java from example
-      - name: Create Extra.java
+      # 🔐 Restore keystore
+      - name: Restore keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
-          cp TMessagesProj/src/main/java/tw/nekomimi/nekogram/Extra.java.example \
-             TMessagesProj/src/main/java/tw/nekomimi/nekogram/Extra.java
+          echo "$KEYSTORE_BASE64" | base64 -d > release.jks
+
+      # 🔐 Create local.properties (signing + ndk)
+      - name: Setup signing config
+        run: |
+          echo "storeFile=release.jks" >> local.properties
+          echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" >> local.properties
+          echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> local.properties
+          echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> local.properties
+          echo "ndk.dir=$ANDROID_HOME/ndk/27.3.13750724" >> local.properties
+
+      # 🧠 Inject Telegram API into build.gradle (NO source modification permanently)
+      - name: Inject Telegram API into build.gradle
+        run: |
+          FILE="TMessagesProj_App/build.gradle"
+
+          if ! grep -q TELEGRAM_API_ID $FILE; then
+            perl -0777 -i -pe '
+            s/defaultConfig\s*\{/
+defaultConfig {
+        buildConfigField "int", "TELEGRAM_API_ID", System.getenv("TELEGRAM_API_ID") ?: "0"
+        buildConfigField "String", "TELEGRAM_API_HASH", "\"\${System.getenv("TELEGRAM_API_HASH") ?: ""}\""
+/s
+            ' $FILE
+          fi
+
+          echo "Injection check:"
+          grep -n TELEGRAM_API $FILE
 
       # 🛡️ Patch syncNumbers()
       - name: Patch syncNumbers()
         run: |
           FILE="TMessagesProj/src/main/java/tw/nekomimi/nekogram/Extra.java"
           perl -0777 -i -pe 's/public static void syncNumbers\(\)\s*\{.*?\}/public static void syncNumbers() { return; }/s' $FILE
-          grep -n "syncNumbers" $FILE || true
 
-      # ⚙️ Set NDK path
-      - name: Set NDK path
-        run: echo "ndk.dir=$ANDROID_HOME/ndk/27.3.13750724" >> local.properties
-
-      # 🚀 Gradle optimizations + disable Sentry
+      # ⚙️ Gradle optimization
       - name: Configure Gradle
         run: |
           echo "org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g" >> gradle.properties
           echo "org.gradle.parallel=true" >> gradle.properties
           echo "sentry.enabled=false" >> gradle.properties
 
-      # 🔢 Get app version
+      # 🔢 Get version
       - name: Get app version
         id: version
         run: |
           VERSION=$(grep APP_VERSION_NAME gradle.properties | cut -d'=' -f2 | tr -d '\r\n')
-          echo "Detected version: $VERSION"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      # 📦 Build APK (arm64 only + skip Sentry tasks just in case)
+      # 📦 Build APK
       - name: Build APK
+        env:
+          TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
+          TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
         run: |
           ./gradlew assembleRelease \
           -PabiFilters=arm64-v8a \
@@ -99,9 +124,8 @@ jobs:
         run: |
           APK_PATH=$(find . -name "*arm64*.apk" | head -n 1)
           echo "apk_path=$APK_PATH" >> $GITHUB_OUTPUT
-          echo "Found APK: $APK_PATH"
 
-      # 🚀 Create GitHub Release
+      # 🚀 Create Release
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
@@ -110,9 +134,9 @@ jobs:
           body: |
             ✔ syncNumbers() disabled
             ✔ ARM64 build
-            ✔ Firebase enabled (notifications working)
+            ✔ Firebase enabled
+            ✔ Signed with custom keystore
             ❌ Sentry disabled
-            ⚠ unsigned APK
           files: ${{ steps.apk.outputs.apk_path }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
