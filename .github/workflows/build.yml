@@ -68,23 +68,18 @@ jobs:
           echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> local.properties
           echo "ndk.dir=$ANDROID_HOME/ndk/27.3.13750724" >> local.properties
 
-      # ✅ FIXED: Inject into correct module
+      # ✅ FIXED injection (SAFE + CORRECT)
       - name: Inject Telegram API into TMessagesProj
         run: |
           FILE="TMessagesProj/build.gradle"
 
           if ! grep -q TELEGRAM_API_ID $FILE; then
-            awk '
-            /defaultConfig[[:space:]]*\{/ {
-              print;
-              print "        def apiId = System.getenv(\"TELEGRAM_API_ID\") ?: \"0\"";
-              print "        def apiHash = System.getenv(\"TELEGRAM_API_HASH\") ?: \"\"";
-              print "        buildConfigField \"int\", \"TELEGRAM_API_ID\", apiId";
-              print "        buildConfigField \"String\", \"TELEGRAM_API_HASH\", \"\\\"\" apiHash \"\\\"\"";
-              next
-            }
-            { print }
-            ' $FILE > tmp && mv tmp $FILE
+            sed -i '/defaultConfig {/a\
+        def TELEGRAM_API_ID_VAL = System.getenv("TELEGRAM_API_ID") ?: "0"\
+        def TELEGRAM_API_HASH_VAL = System.getenv("TELEGRAM_API_HASH") ?: ""\
+        buildConfigField "int", "TELEGRAM_API_ID", TELEGRAM_API_ID_VAL\
+        buildConfigField "String", "TELEGRAM_API_HASH", "\"" + TELEGRAM_API_HASH_VAL + "\""
+            ' $FILE
           fi
 
           echo "Injection check:"
