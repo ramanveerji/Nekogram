@@ -48,18 +48,37 @@ jobs:
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
-          echo "$KEYSTORE_BASE64" | base64 -d > TMessagesProj_App/release.jks
+          # Write to an absolute path so local.properties can reference it unambiguously
+          echo "$KEYSTORE_BASE64" | base64 -d > "${{ github.workspace }}/release.jks"
 
-      - name: Setup signing config
+      - name: Setup local.properties
         run: |
-          echo "storeFile=release.jks" >> local.properties
+          # Use absolute path for storeFile — Gradle's file() in TMessagesProj_App/build.gradle
+          # resolves relative to the module dir, so relative paths silently return null
+          echo "storeFile=${{ github.workspace }}/release.jks" >> local.properties
           echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" >> local.properties
           echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> local.properties
           echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> local.properties
-          echo "ndk.dir=$ANDROID_HOME/ndk/27.3.13750724" >> local.properties
+          # Fix ndk.dir deprecation warning by removing it and using ndkVersion instead
+          echo "android.ndkVersion=27.3.13750724" >> local.properties
 
-      # Inject API credentials into the APP module's build.gradle (not the library)
-      # Targets TMessagesProj_App/build.gradle where defaultConfig generates BuildConfig
+      - name: Set NDK version in library build.gradle
+        run: |
+          # Replace ndk.dir approach with ndkVersion in the library module
+          # This suppresses the CXX5106 flood and uses the modern API
+          FILE="TMessagesProj/build.gradle"
+          if ! grep -q "ndkVersion" "$FILE"; then
+            awk '
+              /android[[:space:]]*\{/ && !injected {
+                print
+                print "    ndkVersion \"27.3.13750724\""
+                injected=1
+                next
+              }
+              { print }
+            ' "$FILE" > tmp && mv tmp "$FILE"
+          fi
+
       - name: Inject Telegram API into app build.gradle
         env:
           TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
@@ -67,20 +86,12 @@ jobs:
         run: |
           FILE="TMessagesProj_App/build.gradle"
 
-          # Safety check — don't double-inject on re-runs
           if grep -q "TELEGRAM_API_ID" "$FILE"; then
             echo "Already injected, skipping."
           else
-            # Build the two lines to inject (Gradle buildConfigField syntax):
-            # int fields still need the value as a quoted string literal in Groovy DSL
             LINE1="        buildConfigField \"int\", \"TELEGRAM_API_ID\", \"${TELEGRAM_API_ID}\""
             LINE2="        buildConfigField \"String\", \"TELEGRAM_API_HASH\", \"\\\"${TELEGRAM_API_HASH}\\\"\""
 
-            # Find the FIRST defaultConfig block (the top-level one, not the nested ones)
-            # and inject after its opening brace.
-            # The app build.gradle has: defaultConfig.applicationId and defaultConfig.versionCode
-            # as standalone lines, plus a defaultConfig { versionName ... } block.
-            # We target the `defaultConfig {` block (the one with a brace on the same line).
             awk -v l1="$LINE1" -v l2="$LINE2" '
               !injected && /defaultConfig[[:space:]]*\{/ {
                 print
