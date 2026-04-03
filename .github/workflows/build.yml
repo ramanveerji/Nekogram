@@ -8,43 +8,43 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 🧹 Free disk space
+      # Cleanup
       - name: Free disk space
         run: |
           sudo rm -rf /usr/share/dotnet
           sudo rm -rf /opt/ghc
           df -h
 
-      # 📥 Checkout
+      # Checkout
       - name: Checkout source
         uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      # ☕ JDK 21
+      # Java
       - name: Setup JDK
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 21
 
-      # 🤖 Android SDK
+      # Android SDK
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      # 📜 Licenses
+      # Licenses
       - name: Accept licenses
         run: yes | sdkmanager --licenses
 
-      # 🧱 NDK
+      # NDK
       - name: Install NDK
         run: sdkmanager "ndk;27.3.13750724"
 
-      # 🔑 Gradle permission
+      # Gradle permission
       - name: Grant gradlew permission
         run: chmod +x gradlew
 
-      # 🔐 Restore Firebase config
+      # Firebase
       - name: Restore google-services.json
         env:
           FIREBASE_JSON: ${{ secrets.FIREBASE_JSON }}
@@ -52,14 +52,14 @@ jobs:
           echo "$FIREBASE_JSON" | base64 -d > TMessagesProj_App/google-services.json
           cp TMessagesProj_App/google-services.json TMessagesProj/google-services.json
 
-      # 🔐 Restore keystore
+      # Keystore
       - name: Restore keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
           echo "$KEYSTORE_BASE64" | base64 -d > release.jks
 
-      # 🔐 Create local.properties (signing + ndk)
+      # Signing config
       - name: Setup signing config
         run: |
           echo "storeFile=release.jks" >> local.properties
@@ -68,41 +68,49 @@ jobs:
           echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> local.properties
           echo "ndk.dir=$ANDROID_HOME/ndk/27.3.13750724" >> local.properties
 
-      # 🧠 Inject Telegram API into build.gradle (NO source modification permanently)
+      # ✅ SAFE TELEGRAM API INJECTION
       - name: Inject Telegram API into build.gradle
         run: |
           FILE="TMessagesProj_App/build.gradle"
 
           if ! grep -q TELEGRAM_API_ID $FILE; then
-            perl -0777 -i -pe '
-            s/defaultConfig\s*\{/defaultConfig {\n        buildConfigField "int", "TELEGRAM_API_ID", System.getenv("TELEGRAM_API_ID") ?: "0"\n        buildConfigField "String", "TELEGRAM_API_HASH", "\"\${System.getenv(\"TELEGRAM_API_HASH\") ?: \"\"}\""/s
-            ' $FILE
+            awk '
+            /defaultConfig[[:space:]]*\{/ {
+              print;
+              print "        def apiId = System.getenv(\"TELEGRAM_API_ID\") ?: \"0\"";
+              print "        def apiHash = System.getenv(\"TELEGRAM_API_HASH\") ?: \"\"";
+              print "        buildConfigField \"int\", \"TELEGRAM_API_ID\", apiId";
+              print "        buildConfigField \"String\", \"TELEGRAM_API_HASH\", \"\\\"\" + apiHash + \"\\\"\"";
+              next
+            }
+            { print }
+            ' $FILE > tmp && mv tmp $FILE
           fi
 
           echo "Injection check:"
-          grep -n TELEGRAM_API $FILE
+          grep -n TELEGRAM_API $FILE || true
 
-      # 🛡️ Patch syncNumbers()
+      # Patch syncNumbers
       - name: Patch syncNumbers()
         run: |
           FILE="TMessagesProj/src/main/java/tw/nekomimi/nekogram/Extra.java"
           perl -0777 -i -pe 's/public static void syncNumbers\(\)\s*\{.*?\}/public static void syncNumbers() { return; }/s' $FILE
 
-      # ⚙️ Gradle optimization
+      # Gradle optimization
       - name: Configure Gradle
         run: |
           echo "org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g" >> gradle.properties
           echo "org.gradle.parallel=true" >> gradle.properties
           echo "sentry.enabled=false" >> gradle.properties
 
-      # 🔢 Get version
+      # Get version
       - name: Get app version
         id: version
         run: |
           VERSION=$(grep APP_VERSION_NAME gradle.properties | cut -d'=' -f2 | tr -d '\r\n')
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      # 📦 Build APK
+      # Build
       - name: Build APK
         env:
           TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
@@ -114,14 +122,15 @@ jobs:
           -x uploadSentryNativeSymbolsForRelease \
           -x sentryBundleSourcesRelease
 
-      # 📁 Locate APK
+      # Locate APK
       - name: Locate APK
         id: apk
         run: |
           APK_PATH=$(find . -name "*arm64*.apk" | head -n 1)
           echo "apk_path=$APK_PATH" >> $GITHUB_OUTPUT
+          echo "Found APK: $APK_PATH"
 
-      # 🚀 Create Release
+      # Release
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
