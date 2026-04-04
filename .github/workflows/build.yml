@@ -150,7 +150,7 @@ jobs:
           
           # 7. Verify UI Header & Dashboard
           grep -q "asShadowSection()" "$GS_FILE" || { echo "FAILED: Shadow Section missing!"; exit 1; }
-          grep -q "Raman\x27s Magic" "$GS_FILE" || { echo "FAILED: Dashboard Header missing!"; exit 1; }
+          grep -q "Raman.s Magic" "$GS_FILE" || { echo "FAILED: Dashboard Header missing!"; exit 1; }
           grep -q "restartRow" "$GS_FILE" || { echo "FAILED: Restart Button missing!"; exit 1; }
           
           echo "✅ All 12 Magic Patches verified successfully. Proceeding to build..."

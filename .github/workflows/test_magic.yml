@@ -65,7 +65,7 @@ jobs:
           grep -q "Extra.isSecretGhostEnabled()" "TMessagesProj/src/main/java/org/telegram/messenger/MessageObject.java" || { echo "FAILED: Secret Media logic missing!"; exit 1; }
           grep -q "isScreenshotsEnabled()" "TMessagesProj/src/main/java/org/telegram/messenger/FlagSecureReason.java" || { echo "FAILED: Screenshot bypass missing!"; exit 1; }
           grep -q "asShadowSection()" "$GS_FILE" || { echo "FAILED: Shadow Section missing!"; exit 1; }
-          grep -q "Raman\x27s Magic" "$GS_FILE" || { echo "FAILED: Dashboard Header missing!"; exit 1; }
+          grep -q "Raman.s Magic" "$GS_FILE" || { echo "FAILED: Dashboard Header missing!"; exit 1; }
           grep -q "MOCK_SIG" TMessagesProj/src/main/java/org/telegram/messenger/AndroidUtilities.java || { echo "FAILED: Signature patch logic changed!"; exit 1; }
 
           echo "✅ Raman's Magic Test PASSED! All patches are correct."
