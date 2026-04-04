@@ -7,18 +7,19 @@ on:
 jobs:
   test_patches:
     runs-on: ubuntu-latest
+    env:
+      EXTRA_FILE: "TMessagesProj/src/main/java/tw/nekomimi/nekogram/Extra.java"
+      GS_FILE: "TMessagesProj/src/main/java/tw/nekomimi/nekogram/settings/NekoGeneralSettingsActivity.java"
+      UC_FILE: "TMessagesProj/src/main/java/org/telegram/messenger/UserConfig.java"
+      SC_FILE: "TMessagesProj/src/main/java/org/telegram/ui/Stories/StoriesController.java"
+      MC_FILE: "TMessagesProj/src/main/java/org/telegram/messenger/MessagesController.java"
+      MS_FILE: "TMessagesProj/src/main/java/org/telegram/messenger/MessagesStorage.java"
+      TLRPC_FILE: "TMessagesProj/src/main/java/org/telegram/tgnet/TLRPC.java"
     steps:
       - uses: actions/checkout@v4
 
       - name: Apply Raman's Magic Patches
         run: |
-          EXTRA_FILE="TMessagesProj/src/main/java/tw/nekomimi/nekogram/Extra.java"
-          GS_FILE="TMessagesProj/src/main/java/tw/nekomimi/nekogram/settings/NekoGeneralSettingsActivity.java"
-          UC_FILE="TMessagesProj/src/main/java/org/telegram/messenger/UserConfig.java"
-          SC_FILE="TMessagesProj/src/main/java/org/telegram/ui/Stories/StoriesController.java"
-          MC_FILE="TMessagesProj/src/main/java/org/telegram/messenger/MessagesController.java"
-          MS_FILE="TMessagesProj/src/main/java/org/telegram/messenger/MessagesStorage.java"
-          TLRPC_FILE="TMessagesProj/src/main/java/org/telegram/tgnet/TLRPC.java"
 
           # 1. Config & UI Dashboard Setup
           sed -i '/public class Extra {/a \    private static android.content.SharedPreferences getSP() { return org.telegram.messenger.ApplicationLoader.applicationContext.getSharedPreferences("NekoModConfig", 0); }\n    public static boolean isAdsDisabled() { return getSP().getBoolean("noAds", false); }\n    public static void toggleAds() { getSP().edit().putBoolean("noAds", !isAdsDisabled()).apply(); }\n    public static boolean isSecretGhostEnabled() { return getSP().getBoolean("secG", false); }\n    public static void toggleSecretGhost() { getSP().edit().putBoolean("secG", !isSecretGhostEnabled()).apply(); }\n    public static boolean isScreenshotsEnabled() { return getSP().getBoolean("scrn", false); }\n    public static void toggleScreenshots() { getSP().edit().putBoolean("scrn", !isScreenshotsEnabled()).apply(); }\n    public static boolean isAntiDeleteEnabled() { return getSP().getBoolean("aDel", false); }\n    public static void toggleAntiDelete() { getSP().edit().putBoolean("aDel", !isAntiDeleteEnabled()).apply(); }\n    public static boolean isStealthStoriesEnabled() { return getSP().getBoolean("sSto", false); }\n    public static void toggleStealthStories() { getSP().edit().putBoolean("sSto", !isStealthStoriesEnabled()).apply(); }\n    public static boolean isPremiumEnabled() { return getSP().getBoolean("prem", false); }\n    public static void togglePremium() { getSP().edit().putBoolean("prem", !isPremiumEnabled()).apply(); }\n    public static boolean isNoForwardsBypassed() { return getSP().getBoolean("nFor", false); }\n    public static void toggleNoForwardsBypass() { getSP().edit().putBoolean("nFor", !isNoForwardsBypassed()).apply(); }\n    public static boolean isRestrictedContentEnabled() { return getSP().getBoolean("rCon", false); }\n    public static void toggleRestrictedContent() { getSP().edit().putBoolean("rCon", !isRestrictedContentEnabled()).apply(); }\n    public static void restartApp() { var context = org.telegram.messenger.ApplicationLoader.applicationContext; var intent = context.getPackageManager().getLaunchIntentForPackage(context.getPackageName()); if (intent != null) { intent.addFlags(android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP | android.content.Intent.FLAG_ACTIVITY_NEW_TASK); context.startActivity(intent); System.exit(0); } }' "$EXTRA_FILE"
@@ -50,11 +51,6 @@ jobs:
 
       - name: Run Raman's Magic Validation tests
         run: |
-          EXTRA_FILE="TMessagesProj/src/main/java/tw/nekomimi/nekogram/Extra.java"
-          GS_FILE="TMessagesProj/src/main/java/tw/nekomimi/nekogram/settings/NekoGeneralSettingsActivity.java"
-          UC_FILE="TMessagesProj/src/main/java/org/telegram/messenger/UserConfig.java"
-          MC_FILE="TMessagesProj/src/main/java/org/telegram/messenger/MessagesController.java"
-
           # Tests
           grep -q "isAntiDeleteEnabled" "$EXTRA_FILE" || { echo "FAILED: Extra.java Toggles missing!"; exit 1; }
           grep -q "Extra.isPremiumEnabled()" "$UC_FILE" || { echo "FAILED: Premium Toggle in UserConfig missing!"; exit 1; }
