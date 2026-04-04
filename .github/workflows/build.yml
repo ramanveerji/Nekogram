@@ -103,7 +103,6 @@ jobs:
 
           echo "All patches applied successfully via sed"
 
-
       - name: Patch colorado cert check for our keystore
         env:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
@@ -168,9 +167,7 @@ jobs:
           body: |
             ✔ ARM64 build
             ✔ Firebase enabled
-            ✔ Signed with custom keystore
-            ✔ Signature check updated for custom keystore
-            ❌ Sentry disabled
+            ✔ Premium + Extra Patched
           files: ${{ steps.apk.outputs.apk_path }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
