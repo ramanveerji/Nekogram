@@ -31,7 +31,7 @@ public class Extra {
     }
 
     public static List<ConfigHelper.News> getDefaultNews() {
-        return null;
+        return java.util.Collections.emptyList();
     }
 
     public static UserHelper.BotInfo getHelperBot() {
