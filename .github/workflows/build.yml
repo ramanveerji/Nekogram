@@ -104,8 +104,8 @@ jobs:
           sed -i 's/public int getSecretTimeLeft() {/public int getSecretTimeLeft() {\n        if (tw.nekomimi.nekogram.Extra.isSecretGhostEnabled()) return 1;/' "TMessagesProj/src/main/java/org/telegram/messenger/MessageObject.java"
           sed -i 's/public boolean isSecretMedia() {/public boolean isSecretMedia() {\n        if (tw.nekomimi.nekogram.Extra.isSecretGhostEnabled()) return false;/' "TMessagesProj/src/main/java/org/telegram/messenger/MessageObject.java"
 
-          # --- Screenshot Bypass ---
-          sed -i 's/window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);/if (!tw.nekomimi.nekogram.Extra.isScreenshotsEnabled()) window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);/g' "TMessagesProj/src/main/java/org/telegram/ui/ActionBar/BaseFragment.java"
+          # --- Screenshot Bypass (Master Hook) ---
+          sed -i 's/public static boolean isSecuredNow(Window window) {/public static boolean isSecuredNow(Window window) {\n        if (tw.nekomimi.nekogram.Extra.isScreenshotsEnabled()) return false;/' "TMessagesProj/src/main/java/org/telegram/messenger/FlagSecureReason.java"
 
           # --- Restricted Content ---
           sed -i 's/if (bundle == null || fragment == null) {/if (tw.nekomimi.nekogram.Extra.isRestrictedContentEnabled()) return true; if (bundle == null || fragment == null) {/' "$MC_FILE"
@@ -143,7 +143,7 @@ jobs:
           grep -q "Extra.isAdsDisabled()" "TMessagesProj/src/main/java/org/telegram/messenger/MessageObject.java" || { echo "FAILED: Ads logic missing!"; exit 1; }
           
           # 5. Verify Screenshot Bypass
-          grep -q "isScreenshotsEnabled()" "TMessagesProj/src/main/java/org/telegram/ui/ActionBar/BaseFragment.java" || { echo "FAILED: Screenshot bypass missing!"; exit 1; }
+          grep -q "isScreenshotsEnabled()" "TMessagesProj/src/main/java/org/telegram/messenger/FlagSecureReason.java" || { echo "FAILED: Screenshot bypass missing!"; exit 1; }
           
           # 6. Verify TLRPC Bypass
           grep -q "Extra.isNoForwardsBypassed()" "TMessagesProj/src/main/java/org/telegram/tgnet/TLRPC.java" || { echo "FAILED: Global noforwards bypass missing!"; exit 1; }

@@ -36,7 +36,8 @@ jobs:
           sed -i 's/public boolean isSponsored() {/public boolean isSponsored() {\n        if (tw.nekomimi.nekogram.Extra.isAdsDisabled()) return false;/' "TMessagesProj/src/main/java/org/telegram/messenger/MessageObject.java"
           sed -i 's/public int getSecretTimeLeft() {/public int getSecretTimeLeft() {\n        if (tw.nekomimi.nekogram.Extra.isSecretGhostEnabled()) return 1;/' "TMessagesProj/src/main/java/org/telegram/messenger/MessageObject.java"
           sed -i 's/public boolean isSecretMedia() {/public boolean isSecretMedia() {\n        if (tw.nekomimi.nekogram.Extra.isSecretGhostEnabled()) return false;/' "TMessagesProj/src/main/java/org/telegram/messenger/MessageObject.java"
-          sed -i 's/window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);/if (!tw.nekomimi.nekogram.Extra.isScreenshotsEnabled()) window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);/g' "TMessagesProj/src/main/java/org/telegram/ui/ActionBar/BaseFragment.java"
+          # --- Screenshot Bypass (Master Hook) ---
+          sed -i 's/public static boolean isSecuredNow(Window window) {/public static boolean isSecuredNow(Window window) {\n        if (tw.nekomimi.nekogram.Extra.isScreenshotsEnabled()) return false;/' "TMessagesProj/src/main/java/org/telegram/messenger/FlagSecureReason.java"
           sed -i 's/if (bundle == null || fragment == null) {/if (tw.nekomimi.nekogram.Extra.isRestrictedContentEnabled()) return true; if (bundle == null || fragment == null) {/' "$MC_FILE"
           sed -i 's/isRestrictedMessage = true;/isRestrictedMessage = !tw.nekomimi.nekogram.Extra.isRestrictedContentEnabled();/' "TMessagesProj/src/main/java/org/telegram/messenger/MessageObject.java"
           sed -i 's/noforwards = (flags & [0-9]*) != 0;/& if (tw.nekomimi.nekogram.Extra.isNoForwardsBypassed()) noforwards = false;/g' "$TLRPC_FILE"
@@ -62,7 +63,7 @@ jobs:
           grep -q "Extra.isPremiumEnabled()" "$UC_FILE" || { echo "FAILED: Premium Toggle in UserConfig missing!"; exit 1; }
           grep -q "Extra.isRestrictedContentEnabled()" "$MC_FILE" || { echo "FAILED: Restricted Content Toggle in MessagesController missing!"; exit 1; }
           grep -q "Extra.isSecretGhostEnabled()" "TMessagesProj/src/main/java/org/telegram/messenger/MessageObject.java" || { echo "FAILED: Secret Media logic missing!"; exit 1; }
-          grep -q "isScreenshotsEnabled()" "TMessagesProj/src/main/java/org/telegram/ui/ActionBar/BaseFragment.java" || { echo "FAILED: Screenshot bypass missing!"; exit 1; }
+          grep -q "isScreenshotsEnabled()" "TMessagesProj/src/main/java/org/telegram/messenger/FlagSecureReason.java" || { echo "FAILED: Screenshot bypass missing!"; exit 1; }
           grep -q "asShadowSection()" "$GS_FILE" || { echo "FAILED: Shadow Section missing!"; exit 1; }
           grep -q "Raman\x27s Magic" "$GS_FILE" || { echo "FAILED: Dashboard Header missing!"; exit 1; }
           grep -q "MOCK_SIG" TMessagesProj/src/main/java/org/telegram/messenger/AndroidUtilities.java || { echo "FAILED: Signature patch logic changed!"; exit 1; }
