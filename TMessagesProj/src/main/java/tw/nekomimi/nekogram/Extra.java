@@ -34,8 +34,20 @@ public class Extra {
         return java.util.Collections.emptyList();
     }
 
+    private static final UserHelper.BotInfo HELPER_BOT = new UserHelper.BotInfo() {
+        @Override
+        public long getId() {
+            return 1190800416L;
+        }
+
+        @Override
+        public String getUsername() {
+            return "nekonotificationbot";
+        }
+    };
+
     public static UserHelper.BotInfo getHelperBot() {
-        return null;
+        return HELPER_BOT;
     }
 
     public static UserHelper.UserInfoBot getUserInfoBot(boolean fallback) {
