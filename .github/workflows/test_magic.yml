@@ -48,9 +48,6 @@ jobs:
           sed -i 's/public boolean markStoryAsRead(long dialogId, TL_stories.StoryItem storyItem) {/& \n        if (tw.nekomimi.nekogram.Extra.isStealthStoriesEnabled()) return false;/' "$SC_FILE"
           sed -i 's/public boolean markStoryAsRead(TL_stories.PeerStories userStories, TL_stories.StoryItem storyItem, boolean profile) {/& \n        if (tw.nekomimi.nekogram.Extra.isStealthStoriesEnabled()) return false;/' "$SC_FILE"
 
-          # 3. Verify Signature Check (Mock Secret)
-          sed -i "s/return \"49C1522548EBACD46CE322B6FD47F6092BB745D0F88082145CAF35E14DCC38E1\";/return \"MOCK_SIG\";/" TMessagesProj/src/main/java/org/telegram/messenger/AndroidUtilities.java
-
       - name: Run Raman's Magic Validation tests
         run: |
           EXTRA_FILE="TMessagesProj/src/main/java/tw/nekomimi/nekogram/Extra.java"
@@ -66,6 +63,5 @@ jobs:
           grep -q "isScreenshotsEnabled()" "TMessagesProj/src/main/java/org/telegram/messenger/FlagSecureReason.java" || { echo "FAILED: Screenshot bypass missing!"; exit 1; }
           grep -q "asShadowSection()" "$GS_FILE" || { echo "FAILED: Shadow Section missing!"; exit 1; }
           grep -q "Raman.s Magic" "$GS_FILE" || { echo "FAILED: Dashboard Header missing!"; exit 1; }
-          grep -q "MOCK_SIG" TMessagesProj/src/main/java/org/telegram/messenger/AndroidUtilities.java || { echo "FAILED: Signature patch logic changed!"; exit 1; }
 
           echo "✅ Raman's Magic Test PASSED! All patches are correct."

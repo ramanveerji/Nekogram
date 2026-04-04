@@ -153,20 +153,6 @@ jobs:
           grep -q "Raman.s Magic" "$GS_FILE" || { echo "FAILED: Dashboard Header missing!"; exit 1; }
           grep -q "restartRow" "$GS_FILE" || { echo "FAILED: Restart Button missing!"; exit 1; }
           
-          echo "✅ All 12 Magic Patches verified successfully. Proceeding to build..."
-
-      - name: Patch Java signature check
-        run: |
-          sed -i "s/return \"49C1522548EBACD46CE322B6FD47F6092BB745D0F88082145CAF35E14DCC38E1\";/return \"${{ secrets.CERT_SHA256 }}\";/" TMessagesProj/src/main/java/org/telegram/messenger/AndroidUtilities.java
-
-      - name: Verify Colorado Java Patch (Sig-Check)
-        run: |
-          if grep -q "49C1522548EBACD46CE322B6FD47F6092BB745D0F88082145CAF35E14DCC38E1" TMessagesProj/src/main/java/org/telegram/messenger/AndroidUtilities.java; then
-            echo "FAILED: AndroidUtilities signature patch failed!"
-            exit 1
-          fi
-          echo "✅ Java Signature patch verified."
-
       - name: Patch colorado cert check for our keystore
         env:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
