@@ -70,55 +70,61 @@ jobs:
 
       - name: Apply Extra patches (Feature Patching)
         run: |
-          # 1. UserConfig.java isPremium fix
-          UC_FILE="TMessagesProj/src/main/java/org/telegram/messenger/UserConfig.java"
-          sed -i 's/return user.premium;/return true;/' "$UC_FILE"
-
-          # 2. MessagesController.java patches
-          MC_FILE="TMessagesProj/src/main/java/org/telegram/messenger/MessagesController.java"
-          # isPremiumFeatureBlocked
-          sed -i 's/return premiumLocked && !getUserConfig().isPremium();/return false;/' "$MC_FILE"
-          # isChatNoForwards
-          sed -i 's/return chat.noforwards;/return false;/' "$MC_FILE"
-          # isPeerNoForwards
-          sed -i 's/return dialogId > 0 ? isUserNoForwards(dialogId) : isChatNoForwards(-dialogId);/return false;/' "$MC_FILE"
-          # isUserNoForwards
-          sed -i 's/return isUserNoForwards(getUserFull(userId));/return false;/' "$MC_FILE"
-          # premiumLocked initial load
-          sed -i 's/premiumLocked = mainPreferences.getBoolean("premiumLocked", false);/premiumLocked = false;/' "$MC_FILE"
-          # premiumLocked update
-          sed -i 's/premiumLocked = ((TLRPC.TL_jsonBool) value.value).value;/premiumLocked = false;/' "$MC_FILE"
-          # checkCanOpenChat bypass
-          sed -i 's/if (bundle == null || fragment == null) {/if (true) return true; if (bundle == null || fragment == null) {/' "$MC_FILE"
-
-          # 4. MessageObject.java logic (isRestrictedMessage bypass)
-          MO_FILE="TMessagesProj/src/main/java/org/telegram/messenger/MessageObject.java"
-          sed -i 's/isRestrictedMessage = true;/isRestrictedMessage = false;/g' "$MO_FILE"
-
-          # 5. Global TLRPC.java noforwards bypass (100% parity with smali)
-          TLRPC_FILE="TMessagesProj/src/main/java/org/telegram/tgnet/TLRPC.java"
-          sed -i 's/noforwards = (flags & /noforwards = false; \/\/ (flags \& /g' "$TLRPC_FILE"
-          sed -i 's/noforwards_my_enabled = /noforwards_my_enabled = false; \/\/ /g' "$TLRPC_FILE"
-          sed -i 's/noforwards_peer_enabled = /noforwards_peer_enabled = false; \/\/ /g' "$TLRPC_FILE"
-
-          # 6. Anti-Delete Messages (Java-side implementation with Toggle)
+          # 1. Config & UI Dashboard Setup (Java-side)
           EXTRA_FILE="TMessagesProj/src/main/java/tw/nekomimi/nekogram/Extra.java"
-          MS_FILE="TMessagesProj/src/main/java/org/telegram/messenger/MessagesStorage.java"
           GS_FILE="TMessagesProj/src/main/java/tw/nekomimi/nekogram/settings/NekoGeneralSettingsActivity.java"
-          
-          # Add storage logic to Extra.java
-          sed -i '/public class Extra {/a \    public static boolean isAntiDeleteEnabled() { return org.telegram.messenger.ApplicationLoader.applicationContext.getSharedPreferences("NekoConfig", 0).getBoolean("antiDelete", false); }\n    public static void toggleAntiDelete() { var sp = org.telegram.messenger.ApplicationLoader.applicationContext.getSharedPreferences("NekoConfig", 0); sp.edit().putBoolean("antiDelete", !sp.getBoolean("antiDelete", false)).apply(); }' "$EXTRA_FILE"
-          
-          # Intercept deletions in MessagesStorage
-          sed -i 's/private ArrayList<Long> markMessagesAsDeletedInternal(long dialogId, ArrayList<Integer> messages, boolean deleteFiles, int mode, int threadMessageId) {/private ArrayList<Long> markMessagesAsDeletedInternal(long dialogId, ArrayList<Integer> messages, boolean deleteFiles, int mode, int threadMessageId) {\n        if (tw.nekomimi.nekogram.Extra.isAntiDeleteEnabled()) return null;/' "$MS_FILE"
-          sed -i 's/private ArrayList<Long> markMessagesAsDeletedInternal(long channelId, int mid, boolean deleteFiles) {/private ArrayList<Long> markMessagesAsDeletedInternal(long channelId, int mid, boolean deleteFiles) {\n        if (tw.nekomimi.nekogram.Extra.isAntiDeleteEnabled()) return null;/' "$MS_FILE"
-          
-          # Add UI Toggle to NekoGeneralSettingsActivity
-          sed -i '/private final int openArchiveOnPullRow/a \    private final int antiDeleteRow = rowId++;' "$GS_FILE"
-          sed -i '/items.add(UItem.asCheck(openArchiveOnPullRow/a \        items.add(UItem.asCheck(antiDeleteRow, "Anti-Delete Messages").setChecked(tw.nekomimi.nekogram.Extra.isAntiDeleteEnabled()));' "$GS_FILE"
-          sed -i '/else if (id == openArchiveOnPullRow) {/i \        } else if (id == antiDeleteRow) {\n            tw.nekomimi.nekogram.Extra.toggleAntiDelete();\n            if (view instanceof org.telegram.ui.Cells.TextCheckCell) {\n                ((org.telegram.ui.Cells.TextCheckCell) view).setChecked(tw.nekomimi.nekogram.Extra.isAntiDeleteEnabled());\n            }' "$GS_FILE"
 
-          echo "All patches applied successfully via sed"
+          # Add storage logic to Extra.java (All Toggles + Restart + Bots)
+          sed -i '/public class Extra {/a \    public static boolean isAdsDisabled() { return getSP().getBoolean("noAds", false); }\n    public static void toggleAds() { getSP().edit().putBoolean("noAds", !isAdsDisabled()).apply(); }\n    public static boolean isSecretGhostEnabled() { return getSP().getBoolean("secG", false); }\n    public static void toggleSecretGhost() { getSP().edit().putBoolean("secG", !isSecretGhostEnabled()).apply(); }\n    public static boolean isScreenshotsEnabled() { return getSP().getBoolean("scrn", false); }\n    public static void toggleScreenshots() { getSP().edit().putBoolean("scrn", !isScreenshotsEnabled()).apply(); }\n    public static boolean isAntiDeleteEnabled() { return getSP().getBoolean("aDel", false); }\n    public static void toggleAntiDelete() { getSP().edit().putBoolean("aDel", !isAntiDeleteEnabled()).apply(); }\n    public static boolean isStealthStoriesEnabled() { return getSP().getBoolean("sSto", false); }\n    public static void toggleStealthStories() { getSP().edit().putBoolean("sSto", !isStealthStoriesEnabled()).apply(); }\n    public static boolean isPremiumEnabled() { return getSP().getBoolean("prem", false); }\n    public static void togglePremium() { getSP().edit().putBoolean("prem", !isPremiumEnabled()).apply(); }\n    public static boolean isNoForwardsBypassed() { return getSP().getBoolean("nFor", false); }\n    public static void toggleNoForwardsBypass() { getSP().edit().putBoolean("nFor", !isNoForwardsBypassed()).apply(); }\n    public static boolean isRestrictedContentEnabled() { return getSP().getBoolean("rCon", false); }\n    public static void toggleRestrictedContent() { getSP().edit().putBoolean("rCon", !isRestrictedContentEnabled()).apply(); }\n    public static void restartApp() { var context = org.telegram.messenger.ApplicationLoader.applicationContext; var intent = context.getPackageManager().getLaunchIntentForPackage(context.getPackageName()); if (intent != null) { intent.addFlags(android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP | android.content.Intent.FLAG_ACTIVITY_NEW_TASK); context.startActivity(intent); System.exit(0); } }\n    public static long getHelperBot() { return 461843950L; }\n    public static long getUserInfoBot() { return 1753443312L; }\n    private static android.content.SharedPreferences getSP() { return org.telegram.messenger.ApplicationLoader.applicationContext.getSharedPreferences("NekoModConfig", 0); }' "$EXTRA_FILE"
+
+          # Add UI Toggles & Restart to NekoGeneralSettingsActivity
+          # Row IDs
+          sed -i '/private final int openArchiveOnPullRow/a \    private final int magicHeaderRow = rowId++;\n    private final int antiDeleteRow = rowId++;\n    private final int stealthStoriesRow = rowId++;\n    private final int premiumRow = rowId++;\n    private final int adsRow = rowId++;\n    private final int secretRow = rowId++;\n    private final int screenshotRow = rowId++;\n    private final int noForwardsRow = rowId++;\n    private final int restrictedContentRow = rowId++;\n    private final int restartRow = rowId++;' "$GS_FILE"
+          # Item Filling
+          sed -i '/items.add(UItem.asCheck(openArchiveOnPullRow/a \        items.add(UItem.asHeader("Raman\x27s Magic"));\n        items.add(UItem.asCheck(antiDeleteRow, "Anti-Delete Messages").setChecked(tw.nekomimi.nekogram.Extra.isAntiDeleteEnabled()));\n        items.add(UItem.asCheck(stealthStoriesRow, "Stealth Mode for Stories").setChecked(tw.nekomimi.nekogram.Extra.isStealthStoriesEnabled()));\n        items.add(UItem.asCheck(premiumRow, "Unlock Premium Features").setChecked(tw.nekomimi.nekogram.Extra.isPremiumEnabled()));\n        items.add(UItem.asCheck(adsRow, "Disable Sponsored Content").setChecked(tw.nekomimi.nekogram.Extra.isAdsDisabled()));\n        items.add(UItem.asCheck(secretRow, "Secret Media Ghost Mode").setChecked(tw.nekomimi.nekogram.Extra.isSecretGhostEnabled()));\n        items.add(UItem.asCheck(screenshotRow, "Allow Screenshots everywhere").setChecked(tw.nekomimi.nekogram.Extra.isScreenshotsEnabled()));\n        items.add(UItem.asCheck(noForwardsRow, "Ignore Channel Restrictions").setChecked(tw.nekomimi.nekogram.Extra.isNoForwardsBypassed()));\n        items.add(UItem.asCheck(restrictedContentRow, "Access Restricted Content").setChecked(tw.nekomimi.nekogram.Extra.isRestrictedContentEnabled()));\n        items.add(UItem.asAction(restartRow, "Restart App (To apply some changes)").setColors(org.telegram.ui.ActionBar.Theme.getColor(org.telegram.ui.ActionBar.Theme.key_text_RedRegular), org.telegram.ui.ActionBar.Theme.getColor(org.telegram.ui.ActionBar.Theme.key_text_RedRegular)));' "$GS_FILE"
+          # Click Handling
+          sed -i '/else if (id == openArchiveOnPullRow) {/i \        } else if (id == antiDeleteRow) {\n            tw.nekomimi.nekogram.Extra.toggleAntiDelete();\n            if (view instanceof org.telegram.ui.Cells.TextCheckCell) ((org.telegram.ui.Cells.TextCheckCell) view).setChecked(tw.nekomimi.nekogram.Extra.isAntiDeleteEnabled());\n        } else if (id == stealthStoriesRow) {\n            tw.nekomimi.nekogram.Extra.toggleStealthStories();\n            if (view instanceof org.telegram.ui.Cells.TextCheckCell) ((org.telegram.ui.Cells.TextCheckCell) view).setChecked(tw.nekomimi.nekogram.Extra.isStealthStoriesEnabled());\n        } else if (id == premiumRow) {\n            tw.nekomimi.nekogram.Extra.togglePremium();\n            if (view instanceof org.telegram.ui.Cells.TextCheckCell) ((org.telegram.ui.Cells.TextCheckCell) view).setChecked(tw.nekomimi.nekogram.Extra.isPremiumEnabled());\n        } else if (id == adsRow) {\n            tw.nekomimi.nekogram.Extra.toggleAds();\n            if (view instanceof org.telegram.ui.Cells.TextCheckCell) ((org.telegram.ui.Cells.TextCheckCell) view).setChecked(tw.nekomimi.nekogram.Extra.isAdsDisabled());\n        } else if (id == secretRow) {\n            tw.nekomimi.nekogram.Extra.toggleSecretGhost();\n            if (view instanceof org.telegram.ui.Cells.TextCheckCell) ((org.telegram.ui.Cells.TextCheckCell) view).setChecked(tw.nekomimi.nekogram.Extra.isSecretGhostEnabled());\n        } else if (id == screenshotRow) {\n            tw.nekomimi.nekogram.Extra.toggleScreenshots();\n            if (view instanceof org.telegram.ui.Cells.TextCheckCell) ((org.telegram.ui.Cells.TextCheckCell) view).setChecked(tw.nekomimi.nekogram.Extra.isScreenshotsEnabled());\n        } else if (id == noForwardsRow) {\n            tw.nekomimi.nekogram.Extra.toggleNoForwardsBypass();\n            if (view instanceof org.telegram.ui.Cells.TextCheckCell) ((org.telegram.ui.Cells.TextCheckCell) view).setChecked(tw.nekomimi.nekogram.Extra.isNoForwardsBypassed());\n        } else if (id == restrictedContentRow) {\n            tw.nekomimi.nekogram.Extra.toggleRestrictedContent();\n            if (view instanceof org.telegram.ui.Cells.TextCheckCell) ((org.telegram.ui.Cells.TextCheckCell) view).setChecked(tw.nekomimi.nekogram.Extra.isRestrictedContentEnabled());\n        } else if (id == restartRow) {\n            tw.nekomimi.nekogram.Extra.restartApp();' "$GS_FILE"
+
+          # 2. Integration Logic (Dynamic Patches)
+
+          # --- Premium Consolidation ---
+          UC_FILE="TMessagesProj/src/main/java/org/telegram/messenger/UserConfig.java"
+          sed -i 's/return user.premium;/return tw.nekomimi.nekogram.Extra.isPremiumEnabled() || user.premium;/' "$UC_FILE"
+          SC_FILE="TMessagesProj/src/main/java/org/telegram/ui/Stories/StoriesController.java"
+          sed -i 's/private boolean isPremium(long dialogId) {/private boolean isPremium(long dialogId) {\n        if (tw.nekomimi.nekogram.Extra.isPremiumEnabled()) return true;/' "$SC_FILE"
+          sed -i 's/public final boolean isPremiumFeatureAvailable(int feature) {/public final boolean isPremiumFeatureAvailable(int feature) {\n        if (tw.nekomimi.nekogram.Extra.isPremiumEnabled()) return true;/' "TMessagesProj/src/main/java/org/telegram/messenger/MessagesController.java"
+
+          # --- Ads / Sponsored Messages ---
+          MC_FILE="TMessagesProj/src/main/java/org/telegram/messenger/MessagesController.java"
+          sed -i 's/public boolean isSponsoredDisabled() {/public boolean isSponsoredDisabled() {\n        if (tw.nekomimi.nekogram.Extra.isAdsDisabled()) return true;/' "$MC_FILE"
+          sed -i 's/private void checkPromoInfoInternal(boolean force) {/private void checkPromoInfoInternal(boolean force) {\n        if (tw.nekomimi.nekogram.Extra.isAdsDisabled()) return;/' "$MC_FILE"
+          sed -i 's/public boolean isSponsored() {/public boolean isSponsored() {\n        if (tw.nekomimi.nekogram.Extra.isAdsDisabled()) return false;/' "TMessagesProj/src/main/java/org/telegram/messenger/MessageObject.java"
+
+          # --- Secret Media Ghost Mode ---
+          sed -i 's/public int getSecretTimeLeft() {/public int getSecretTimeLeft() {\n        if (tw.nekomimi.nekogram.Extra.isSecretGhostEnabled()) return 1;/' "TMessagesProj/src/main/java/org/telegram/messenger/MessageObject.java"
+          sed -i 's/public boolean isSecretMedia() {/public boolean isSecretMedia() {\n        if (tw.nekomimi.nekogram.Extra.isSecretGhostEnabled()) return false;/' "TMessagesProj/src/main/java/org/telegram/messenger/MessageObject.java"
+
+          # --- Screenshot Bypass ---
+          sed -i 's/window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);/if (!tw.nekomimi.nekogram.Extra.isScreenshotsEnabled()) window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);/g' "TMessagesProj/src/main/java/org/telegram/ui/ActionBar/BaseFragment.java"
+
+          # --- Restricted Content ---
+          sed -i 's/if (bundle == null || fragment == null) {/if (tw.nekomimi.nekogram.Extra.isRestrictedContentEnabled()) return true; if (bundle == null || fragment == null) {/' "$MC_FILE"
+          sed -i 's/isRestrictedMessage = true;/isRestrictedMessage = !tw.nekomimi.nekogram.Extra.isRestrictedContentEnabled();/' "TMessagesProj/src/main/java/org/telegram/messenger/MessageObject.java"
+
+          # --- Global noforwards (Channel Restrictions) ---
+          TLRPC_FILE="TMessagesProj/src/main/java/org/telegram/tgnet/TLRPC.java"
+          sed -i 's/noforwards = (flags & [0-9]*) != 0;/& if (tw.nekomimi.nekogram.Extra.isNoForwardsBypassed()) noforwards = false;/g' "$TLRPC_FILE"
+          sed -i 's/noforwards_my_enabled = hasFlag(flags2, FLAG_22);/& if (tw.nekomimi.nekogram.Extra.isNoForwardsBypassed()) noforwards_my_enabled = false;/g' "$TLRPC_FILE"
+          sed -i 's/noforwards_peer_enabled = hasFlag(flags2, FLAG_24);/& if (tw.nekomimi.nekogram.Extra.isNoForwardsBypassed()) noforwards_peer_enabled = false;/g' "$TLRPC_FILE"
+
+          # --- Anti-Delete & Stealth Stories (Already dynamic) ---
+          MS_FILE="TMessagesProj/src/main/java/org/telegram/messenger/MessagesStorage.java"
+          sed -i 's/private ArrayList<Long> markMessagesAsDeletedInternal(long dialogId, ArrayList<Integer> messages, boolean deleteFiles, int mode, int threadMessageId) {/& \n        if (tw.nekomimi.nekogram.Extra.isAntiDeleteEnabled()) return null;/' "$MS_FILE"
+          sed -i 's/private ArrayList<Long> markMessagesAsDeletedInternal(long channelId, int mid, boolean deleteFiles) {/& \n        if (tw.nekomimi.nekogram.Extra.isAntiDeleteEnabled()) return null;/' "$MS_FILE"
+          sed -i 's/public boolean markStoryAsRead(long dialogId, TL_stories.StoryItem storyItem) {/& \n        if (tw.nekomimi.nekogram.Extra.isStealthStoriesEnabled()) return false;/' "$SC_FILE"
+          sed -i 's/public boolean markStoryAsRead(TL_stories.PeerStories userStories, TL_stories.StoryItem storyItem, boolean profile) {/& \n        if (tw.nekomimi.nekogram.Extra.isStealthStoriesEnabled()) return false;/' "$SC_FILE"
+
+          echo "All patches applied successfully via advanced dynamic sed"
 
       - name: Patch colorado cert check for our keystore
         env:
