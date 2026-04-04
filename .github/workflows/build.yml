@@ -6,6 +6,14 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      EXTRA_FILE: "TMessagesProj/src/main/java/tw/nekomimi/nekogram/Extra.java"
+      GS_FILE: "TMessagesProj/src/main/java/tw/nekomimi/nekogram/settings/NekoGeneralSettingsActivity.java"
+      UC_FILE: "TMessagesProj/src/main/java/org/telegram/messenger/UserConfig.java"
+      SC_FILE: "TMessagesProj/src/main/java/org/telegram/ui/Stories/StoriesController.java"
+      MC_FILE: "TMessagesProj/src/main/java/org/telegram/messenger/MessagesController.java"
+      MS_FILE: "TMessagesProj/src/main/java/org/telegram/messenger/MessagesStorage.java"
+      TLRPC_FILE: "TMessagesProj/src/main/java/org/telegram/tgnet/TLRPC.java"
 
     steps:
       - name: Free disk space
