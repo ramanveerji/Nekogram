@@ -68,6 +68,42 @@ jobs:
           echo "--- Verification ---"
           grep "APP_ID\|APP_HASH" "$EXTRA"
 
+      - name: Apply Extra patches (Feature Patching)
+        run: |
+          # 1. UserConfig.java isPremium fix
+          UC_FILE="TMessagesProj/src/main/java/org/telegram/messenger/UserConfig.java"
+          sed -i 's/return user.premium;/return true;/' "$UC_FILE"
+
+          # 2. MessagesController.java patches
+          MC_FILE="TMessagesProj/src/main/java/org/telegram/messenger/MessagesController.java"
+          # isPremiumFeatureBlocked
+          sed -i 's/return premiumLocked && !getUserConfig().isPremium();/return false;/' "$MC_FILE"
+          # isChatNoForwards
+          sed -i 's/return chat.noforwards;/return false;/' "$MC_FILE"
+          # isPeerNoForwards
+          sed -i 's/return dialogId > 0 ? isUserNoForwards(dialogId) : isChatNoForwards(-dialogId);/return false;/' "$MC_FILE"
+          # isUserNoForwards
+          sed -i 's/return isUserNoForwards(getUserFull(userId));/return false;/' "$MC_FILE"
+          # premiumLocked initial load
+          sed -i 's/premiumLocked = mainPreferences.getBoolean("premiumLocked", false);/premiumLocked = false;/' "$MC_FILE"
+          # premiumLocked update
+          sed -i 's/premiumLocked = ((TLRPC.TL_jsonBool) value.value).value;/premiumLocked = false;/' "$MC_FILE"
+          # checkCanOpenChat bypass
+          sed -i 's/if (bundle == null || fragment == null) {/if (true) return true; if (bundle == null || fragment == null) {/' "$MC_FILE"
+
+          # 3. MessageObject.java patches
+          MO_FILE="TMessagesProj/src/main/java/org/telegram/messenger/MessageObject.java"
+          # isRestrictedMessage
+          sed -i 's/isRestrictedMessage = true;/isRestrictedMessage = false;/g' "$MO_FILE"
+          # noforwards local variable
+          sed -i 's/boolean noforwards = messageOwner != null && messageOwner.noforwards;/boolean noforwards = false;/' "$MO_FILE"
+          sed -i 's/boolean noforwards = messageObject != null && messageObject.messageOwner != null && messageObject.messageOwner.noforwards;/boolean noforwards = false;/' "$MO_FILE"
+          # canForwardMessage bypass
+          sed -i 's/!messageOwner.noforwards;/true;/' "$MO_FILE"
+
+          echo "All patches applied successfully via sed"
+
+
       - name: Patch colorado cert check for our keystore
         env:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
