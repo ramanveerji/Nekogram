@@ -101,6 +101,23 @@ jobs:
           sed -i 's/noforwards_my_enabled = /noforwards_my_enabled = false; \/\/ /g' "$TLRPC_FILE"
           sed -i 's/noforwards_peer_enabled = /noforwards_peer_enabled = false; \/\/ /g' "$TLRPC_FILE"
 
+          # 6. Anti-Delete Messages (Java-side implementation with Toggle)
+          EXTRA_FILE="TMessagesProj/src/main/java/tw/nekomimi/nekogram/Extra.java"
+          MS_FILE="TMessagesProj/src/main/java/org/telegram/messenger/MessagesStorage.java"
+          GS_FILE="TMessagesProj/src/main/java/tw/nekomimi/nekogram/settings/NekoGeneralSettingsActivity.java"
+          
+          # Add storage logic to Extra.java
+          sed -i '/public class Extra {/a \    public static boolean isAntiDeleteEnabled() { return org.telegram.messenger.ApplicationLoader.applicationContext.getSharedPreferences("NekoConfig", 0).getBoolean("antiDelete", false); }\n    public static void toggleAntiDelete() { var sp = org.telegram.messenger.ApplicationLoader.applicationContext.getSharedPreferences("NekoConfig", 0); sp.edit().putBoolean("antiDelete", !sp.getBoolean("antiDelete", false)).apply(); }' "$EXTRA_FILE"
+          
+          # Intercept deletions in MessagesStorage
+          sed -i 's/private ArrayList<Long> markMessagesAsDeletedInternal(long dialogId, ArrayList<Integer> messages, boolean deleteFiles, int mode, int threadMessageId) {/private ArrayList<Long> markMessagesAsDeletedInternal(long dialogId, ArrayList<Integer> messages, boolean deleteFiles, int mode, int threadMessageId) {\n        if (tw.nekomimi.nekogram.Extra.isAntiDeleteEnabled()) return null;/' "$MS_FILE"
+          sed -i 's/private ArrayList<Long> markMessagesAsDeletedInternal(long channelId, int mid, boolean deleteFiles) {/private ArrayList<Long> markMessagesAsDeletedInternal(long channelId, int mid, boolean deleteFiles) {\n        if (tw.nekomimi.nekogram.Extra.isAntiDeleteEnabled()) return null;/' "$MS_FILE"
+          
+          # Add UI Toggle to NekoGeneralSettingsActivity
+          sed -i '/private final int openArchiveOnPullRow/a \    private final int antiDeleteRow = rowId++;' "$GS_FILE"
+          sed -i '/items.add(UItem.asCheck(openArchiveOnPullRow/a \        items.add(UItem.asCheck(antiDeleteRow, "Anti-Delete Messages").setChecked(tw.nekomimi.nekogram.Extra.isAntiDeleteEnabled()));' "$GS_FILE"
+          sed -i '/else if (id == openArchiveOnPullRow) {/i \        } else if (id == antiDeleteRow) {\n            tw.nekomimi.nekogram.Extra.toggleAntiDelete();\n            if (view instanceof org.telegram.ui.Cells.TextCheckCell) {\n                ((org.telegram.ui.Cells.TextCheckCell) view).setChecked(tw.nekomimi.nekogram.Extra.isAntiDeleteEnabled());\n            }' "$GS_FILE"
+
           echo "All patches applied successfully via sed"
 
       - name: Patch colorado cert check for our keystore
