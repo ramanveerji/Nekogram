@@ -126,6 +126,46 @@ jobs:
 
           echo "All patches applied successfully via advanced dynamic sed"
 
+      - name: Verify Raman's Magic (Pre-Build Test)
+        run: |
+          # 1. Verify Extra.java Logic
+          grep -q "isAntiDeleteEnabled" "$EXTRA_FILE" || { echo "FAILED: Extra.java Toggles missing!"; exit 1; }
+          grep -q "restartApp" "$EXTRA_FILE" || { echo "FAILED: Restart Logic missing!"; exit 1; }
+          
+          # 2. Verify UserConfig Premium Toggle
+          grep -q "Extra.isPremiumEnabled()" "$UC_FILE" || { echo "FAILED: Premium Toggle in UserConfig missing!"; exit 1; }
+          
+          # 3. Verify MessagesController Toggles
+          grep -q "Extra.isRestrictedContentEnabled()" "$MC_FILE" || { echo "FAILED: Restricted Content Toggle in MessagesController missing!"; exit 1; }
+          
+          # 4. Verify MessageObject Logic
+          grep -q "Extra.isSecretGhostEnabled()" "TMessagesProj/src/main/java/org/telegram/messenger/MessageObject.java" || { echo "FAILED: Secret Media logic missing!"; exit 1; }
+          grep -q "Extra.isAdsDisabled()" "TMessagesProj/src/main/java/org/telegram/messenger/MessageObject.java" || { echo "FAILED: Ads logic missing!"; exit 1; }
+          
+          # 5. Verify Screenshot Bypass
+          grep -q "Extra.isScreenshotsEnabled()" "TMessagesProj/src/main/java/org/telegram/ui/ActionBar/BaseFragment.java" || { echo "FAILED: Screenshot bypass missing!"; exit 1; }
+          
+          # 6. Verify TLRPC Bypass
+          grep -q "Extra.isNoForwardsBypassed()" "TMessagesProj/src/main/java/org/telegram/tgnet/TLRPC.java" || { echo "FAILED: Global noforwards bypass missing!"; exit 1; }
+          
+          # 7. Verify UI Header & Dashboard
+          grep -q "Raman\x27s Magic" "$GS_FILE" || { echo "FAILED: Raman's Magic Header missing!"; exit 1; }
+          grep -q "restartRow" "$GS_FILE" || { echo "FAILED: Restart Button missing!"; exit 1; }
+          
+          echo "✅ All 12 Magic Patches verified successfully. Proceeding to build..."
+
+      - name: Patch Java signature check
+        run: |
+          sed -i "s/return \"49C1522548EBACD46CE322B6FD47F6092BB745D0F88082145CAF35E14DCC38E1\";/return \"${{ secrets.CERT_SHA256 }}\";/" TMessagesProj/src/main/java/org/telegram/messenger/AndroidUtilities.java
+
+      - name: Verify Colorado Java Patch (Sig-Check)
+        run: |
+          if grep -q "49C1522548EBACD46CE322B6FD47F6092BB745D0F88082145CAF35E14DCC38E1" TMessagesProj/src/main/java/org/telegram/messenger/AndroidUtilities.java; then
+            echo "FAILED: AndroidUtilities signature patch failed!"
+            exit 1
+          fi
+          echo "✅ Java Signature patch verified."
+
       - name: Patch colorado cert check for our keystore
         env:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
