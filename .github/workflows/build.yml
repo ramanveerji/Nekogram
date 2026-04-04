@@ -57,20 +57,44 @@ jobs:
           echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> local.properties
           echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> local.properties
 
-      # Inject real API credentials as compile-time constants into Extra.java
-      # sed targets the exact placeholder lines (APP_ID = 0 and APP_HASH = "")
       - name: Inject Telegram API credentials into Extra.java
         env:
           TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
           TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
         run: |
           EXTRA="TMessagesProj/src/main/java/tw/nekomimi/nekogram/Extra.java"
-
           sed -i "s/public static final int APP_ID = 0;/public static final int APP_ID = ${TELEGRAM_API_ID};/" "$EXTRA"
           sed -i "s/public static final String APP_HASH = \"\";/public static final String APP_HASH = \"${TELEGRAM_API_HASH}\";/" "$EXTRA"
-
           echo "--- Verification ---"
           grep "APP_ID\|APP_HASH" "$EXTRA"
+
+      - name: Patch colorado cert check for our keystore
+        env:
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: |
+          keytool -exportcert \
+            -keystore TMessagesProj_App/release.jks \
+            -alias "$KEY_ALIAS" \
+            -storepass "$KEYSTORE_PASSWORD" \
+            -file /tmp/mycert.der
+
+          python3 - << 'EOF'
+          import zlib, re
+          data = open('/tmp/mycert.der', 'rb').read()
+          size = len(data)
+          crc  = zlib.crc32(data) & 0xffffffff
+          print(f"Cert size : {size} ({hex(size)})")
+          print(f"Cert CRC32: {hex(crc)}")
+          h = open('TMessagesProj/jni/colorado/colorado.h').read()
+          h = re.sub(r'#define CERT_HASH 0x[0-9a-fA-F]+', f'#define CERT_HASH {hex(crc)}', h)
+          h = re.sub(r'#define CERT_SIZE 0x[0-9a-fA-F]+', f'#define CERT_SIZE {hex(size)}', h)
+          open('TMessagesProj/jni/colorado/colorado.h', 'w').write(h)
+          print("Patched colorado.h successfully")
+          EOF
+
+          echo "--- colorado.h ---"
+          cat TMessagesProj/jni/colorado/colorado.h
 
       - name: Configure Gradle
         run: |
@@ -81,8 +105,9 @@ jobs:
       - name: Get app version
         id: version
         run: |
-          VERSION=$(grep APP_VERSION_NAME gradle.properties | cut -d'=' -f2 | tr -d '\r\n')
+          VERSION=$(grep -m1 "^APP_VERSION_NAME=" gradle.properties | cut -d'=' -f2 | tr -d '\r\n')
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Version: $VERSION"
 
       - name: Build APK
         run: |
@@ -108,6 +133,7 @@ jobs:
             ✔ ARM64 build
             ✔ Firebase enabled
             ✔ Signed with custom keystore
+            ✔ Signature check updated for custom keystore
             ❌ Sentry disabled
           files: ${{ steps.apk.outputs.apk_path }}
         env:
