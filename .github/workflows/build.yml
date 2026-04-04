@@ -91,15 +91,15 @@ jobs:
           # checkCanOpenChat bypass
           sed -i 's/if (bundle == null || fragment == null) {/if (true) return true; if (bundle == null || fragment == null) {/' "$MC_FILE"
 
-          # 3. MessageObject.java patches
+          # 4. MessageObject.java logic (isRestrictedMessage bypass)
           MO_FILE="TMessagesProj/src/main/java/org/telegram/messenger/MessageObject.java"
-          # isRestrictedMessage
           sed -i 's/isRestrictedMessage = true;/isRestrictedMessage = false;/g' "$MO_FILE"
-          # noforwards local variable
-          sed -i 's/boolean noforwards = messageOwner != null && messageOwner.noforwards;/boolean noforwards = false;/' "$MO_FILE"
-          sed -i 's/boolean noforwards = messageObject != null && messageObject.messageOwner != null && messageObject.messageOwner.noforwards;/boolean noforwards = false;/' "$MO_FILE"
-          # canForwardMessage bypass
-          sed -i 's/!messageOwner.noforwards;/true;/' "$MO_FILE"
+
+          # 5. Global TLRPC.java noforwards bypass (100% parity with smali)
+          TLRPC_FILE="TMessagesProj/src/main/java/org/telegram/tgnet/TLRPC.java"
+          sed -i 's/noforwards = (flags & /noforwards = false; \/\/ (flags \& /g' "$TLRPC_FILE"
+          sed -i 's/noforwards_my_enabled = /noforwards_my_enabled = false; \/\/ /g' "$TLRPC_FILE"
+          sed -i 's/noforwards_peer_enabled = /noforwards_peer_enabled = false; \/\/ /g' "$TLRPC_FILE"
 
           echo "All patches applied successfully via sed"
 
