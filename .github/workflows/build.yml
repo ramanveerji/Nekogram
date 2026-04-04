@@ -8,43 +8,35 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Cleanup
       - name: Free disk space
         run: |
           sudo rm -rf /usr/share/dotnet
           sudo rm -rf /opt/ghc
           df -h
 
-      # Checkout
       - name: Checkout source
         uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      # Java
       - name: Setup JDK
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 21
 
-      # Android SDK
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      # Licenses
       - name: Accept licenses
         run: yes | sdkmanager --licenses
 
-      # NDK
       - name: Install NDK
         run: sdkmanager "ndk;27.3.13750724"
 
-      # Gradle permission
       - name: Grant gradlew permission
         run: chmod +x gradlew
 
-      # Firebase config
       - name: Restore google-services.json
         env:
           FIREBASE_JSON: ${{ secrets.FIREBASE_JSON }}
@@ -52,14 +44,12 @@ jobs:
           echo "$FIREBASE_JSON" | base64 -d > TMessagesProj_App/google-services.json
           cp TMessagesProj_App/google-services.json TMessagesProj/google-services.json
 
-      # Keystore (FIXED PATH ✅)
       - name: Restore keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
           echo "$KEYSTORE_BASE64" | base64 -d > TMessagesProj_App/release.jks
 
-      # Signing config (FIXED PATH ✅)
       - name: Setup signing config
         run: |
           echo "storeFile=release.jks" >> local.properties
@@ -67,32 +57,41 @@ jobs:
           echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> local.properties
           echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> local.properties
 
-      # Gradle optimization
+      # Inject real API credentials as compile-time constants into Extra.java
+      # sed targets the exact placeholder lines (APP_ID = 0 and APP_HASH = "")
+      - name: Inject Telegram API credentials into Extra.java
+        env:
+          TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
+          TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
+        run: |
+          EXTRA="TMessagesProj/src/main/java/tw/nekomimi/nekogram/Extra.java"
+
+          sed -i "s/public static final int APP_ID = 0;/public static final int APP_ID = ${TELEGRAM_API_ID};/" "$EXTRA"
+          sed -i "s/public static final String APP_HASH = \"\";/public static final String APP_HASH = \"${TELEGRAM_API_HASH}\";/" "$EXTRA"
+
+          echo "--- Verification ---"
+          grep "APP_ID\|APP_HASH" "$EXTRA"
+
       - name: Configure Gradle
         run: |
           echo "org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g" >> gradle.properties
           echo "org.gradle.parallel=true" >> gradle.properties
           echo "sentry.enabled=false" >> gradle.properties
 
-      # Get version
       - name: Get app version
         id: version
         run: |
           VERSION=$(grep APP_VERSION_NAME gradle.properties | cut -d'=' -f2 | tr -d '\r\n')
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      # Build APK (using system properties for Extra.java)
       - name: Build APK
         run: |
           ./gradlew assembleRelease \
             -PabiFilters=arm64-v8a \
-            -DTELEGRAM_API_ID=${{ secrets.TELEGRAM_API_ID }} \
-            -DTELEGRAM_API_HASH=${{ secrets.TELEGRAM_API_HASH }} \
             -x uploadSentryProguardMappingsRelease \
             -x uploadSentryNativeSymbolsForRelease \
             -x sentryBundleSourcesRelease
 
-      # Locate APK
       - name: Locate APK
         id: apk
         run: |
@@ -100,7 +99,6 @@ jobs:
           echo "apk_path=$APK_PATH" >> $GITHUB_OUTPUT
           echo "Found APK: $APK_PATH"
 
-      # Release
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
@@ -110,7 +108,6 @@ jobs:
             ✔ ARM64 build
             ✔ Firebase enabled
             ✔ Signed with custom keystore
-            ✔ Analytics disabled
             ❌ Sentry disabled
           files: ${{ steps.apk.outputs.apk_path }}
         env:
