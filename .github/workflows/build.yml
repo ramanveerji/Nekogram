@@ -86,7 +86,7 @@ jobs:
           # Row IDs
           sed -i '/private final int openArchiveOnPullRow/a \    private final int magicShadowRow = rowId++;\n    private final int magicHeaderRow = rowId++;\n    private final int antiDeleteRow = rowId++;\n    private final int stealthStoriesRow = rowId++;\n    private final int premiumRow = rowId++;\n    private final int adsRow = rowId++;\n    private final int secretRow = rowId++;\n    private final int screenshotRow = rowId++;\n    private final int noForwardsRow = rowId++;\n    private final int restrictedContentRow = rowId++;\n    private final int restartRow = rowId++;' "$GS_FILE"
           # Item Filling
-          sed -i '/items.add(UItem.asCheck(openArchiveOnPullRow/a \        items.add(UItem.asShadowSection());\n        items.add(UItem.asHeader("Raman\x27s Magic"));\n        items.add(UItem.asCheck(antiDeleteRow, "Anti-Delete Messages").setChecked(tw.nekomimi.nekogram.Extra.isAntiDeleteEnabled()));\n        items.add(UItem.asCheck(stealthStoriesRow, "Stealth Mode for Stories").setChecked(tw.nekomimi.nekogram.Extra.isStealthStoriesEnabled()));\n        items.add(UItem.asCheck(premiumRow, "Unlock Premium Features").setChecked(tw.nekomimi.nekogram.Extra.isPremiumEnabled()));\n        items.add(UItem.asCheck(adsRow, "Disable Sponsored Content").setChecked(tw.nekomimi.nekogram.Extra.isAdsDisabled()));\n        items.add(UItem.asCheck(secretRow, "Secret Media Ghost Mode").setChecked(tw.nekomimi.nekogram.Extra.isSecretGhostEnabled()));\n        items.add(UItem.asCheck(screenshotRow, "Allow Screenshots everywhere").setChecked(tw.nekomimi.nekogram.Extra.isScreenshotsEnabled()));\n        items.add(UItem.asCheck(noForwardsRow, "Ignore Channel Restrictions").setChecked(tw.nekomimi.nekogram.Extra.isNoForwardsBypassed()));\n        items.add(UItem.asCheck(restrictedContentRow, "Access Restricted Content").setChecked(tw.nekomimi.nekogram.Extra.isRestrictedContentEnabled()));\n        items.add(UItem.asButton(restartRow, "Restart App (To apply some changes)"));' "$GS_FILE"
+          sed -i '/items.add(UItem.asCheck(openArchiveOnPullRow/a \        items.add(UItem.asShadow(null));\n        items.add(UItem.asHeader("Raman\x27s Magic"));\n        items.add(UItem.asCheck(antiDeleteRow, "Anti-Delete Messages").setChecked(tw.nekomimi.nekogram.Extra.isAntiDeleteEnabled()));\n        items.add(UItem.asCheck(stealthStoriesRow, "Stealth Mode for Stories").setChecked(tw.nekomimi.nekogram.Extra.isStealthStoriesEnabled()));\n        items.add(UItem.asCheck(premiumRow, "Unlock Premium Features").setChecked(tw.nekomimi.nekogram.Extra.isPremiumEnabled()));\n        items.add(UItem.asCheck(adsRow, "Disable Sponsored Content").setChecked(tw.nekomimi.nekogram.Extra.isAdsDisabled()));\n        items.add(UItem.asCheck(secretRow, "Secret Media Ghost Mode").setChecked(tw.nekomimi.nekogram.Extra.isSecretGhostEnabled()));\n        items.add(UItem.asCheck(screenshotRow, "Allow Screenshots everywhere").setChecked(tw.nekomimi.nekogram.Extra.isScreenshotsEnabled()));\n        items.add(UItem.asCheck(noForwardsRow, "Ignore Channel Restrictions").setChecked(tw.nekomimi.nekogram.Extra.isNoForwardsBypassed()));\n        items.add(UItem.asCheck(restrictedContentRow, "Access Restricted Content").setChecked(tw.nekomimi.nekogram.Extra.isRestrictedContentEnabled()));\n        items.add(UItem.asButton(restartRow, "Restart App (To apply some changes)"));' "$GS_FILE"
           # Click Handling
           sed -i '/else if (id == openArchiveOnPullRow) {/i \        } else if (id == antiDeleteRow) {\n            tw.nekomimi.nekogram.Extra.toggleAntiDelete();\n            if (view instanceof org.telegram.ui.Cells.TextCheckCell) ((org.telegram.ui.Cells.TextCheckCell) view).setChecked(tw.nekomimi.nekogram.Extra.isAntiDeleteEnabled());\n        } else if (id == stealthStoriesRow) {\n            tw.nekomimi.nekogram.Extra.toggleStealthStories();\n            if (view instanceof org.telegram.ui.Cells.TextCheckCell) ((org.telegram.ui.Cells.TextCheckCell) view).setChecked(tw.nekomimi.nekogram.Extra.isStealthStoriesEnabled());\n        } else if (id == premiumRow) {\n            tw.nekomimi.nekogram.Extra.togglePremium();\n            if (view instanceof org.telegram.ui.Cells.TextCheckCell) ((org.telegram.ui.Cells.TextCheckCell) view).setChecked(tw.nekomimi.nekogram.Extra.isPremiumEnabled());\n        } else if (id == adsRow) {\n            tw.nekomimi.nekogram.Extra.toggleAds();\n            if (view instanceof org.telegram.ui.Cells.TextCheckCell) ((org.telegram.ui.Cells.TextCheckCell) view).setChecked(tw.nekomimi.nekogram.Extra.isAdsDisabled());\n        } else if (id == secretRow) {\n            tw.nekomimi.nekogram.Extra.toggleSecretGhost();\n            if (view instanceof org.telegram.ui.Cells.TextCheckCell) ((org.telegram.ui.Cells.TextCheckCell) view).setChecked(tw.nekomimi.nekogram.Extra.isSecretGhostEnabled());\n        } else if (id == screenshotRow) {\n            tw.nekomimi.nekogram.Extra.toggleScreenshots();\n            if (view instanceof org.telegram.ui.Cells.TextCheckCell) ((org.telegram.ui.Cells.TextCheckCell) view).setChecked(tw.nekomimi.nekogram.Extra.isScreenshotsEnabled());\n        } else if (id == noForwardsRow) {\n            tw.nekomimi.nekogram.Extra.toggleNoForwardsBypass();\n            if (view instanceof org.telegram.ui.Cells.TextCheckCell) ((org.telegram.ui.Cells.TextCheckCell) view).setChecked(tw.nekomimi.nekogram.Extra.isNoForwardsBypassed());\n        } else if (id == restrictedContentRow) {\n            tw.nekomimi.nekogram.Extra.toggleRestrictedContent();\n            if (view instanceof org.telegram.ui.Cells.TextCheckCell) ((org.telegram.ui.Cells.TextCheckCell) view).setChecked(tw.nekomimi.nekogram.Extra.isRestrictedContentEnabled());\n        } else if (id == restartRow) {\n            tw.nekomimi.nekogram.Extra.restartApp();' "$GS_FILE"
 
@@ -154,7 +154,7 @@ jobs:
           grep -q "Extra.isNoForwardsBypassed()" "TMessagesProj/src/main/java/org/telegram/tgnet/TLRPC.java" || { echo "FAILED: Global noforwards bypass missing!"; exit 1; }
           
           # 7. Verify UI Header & Dashboard
-          grep -q "asShadowSection()" "$GS_FILE" || { echo "FAILED: Shadow Section missing!"; exit 1; }
+          grep -q "asShadow(null)" "$GS_FILE" || { echo "FAILED: Shadow Section missing!"; exit 1; }
           grep -q "Raman.s Magic" "$GS_FILE" || { echo "FAILED: Dashboard Header missing!"; exit 1; }
           grep -q "restartRow" "$GS_FILE" || { echo "FAILED: Restart Button missing!"; exit 1; }
           
@@ -185,6 +185,64 @@ jobs:
 
           echo "--- colorado.h ---"
           cat TMessagesProj/jni/colorado/colorado.h
+
+      - name: Fix XML resource strings
+        run: |
+          python3 - << 'EOF'
+          import os, re
+          strings_to_fix = [
+              "CloudConfigSyncDate", "Gift2ActiveAuctionsActiveBidActive", "Gift2ActiveAuctionsActiveRound",
+              "Gift2AuctionInfo2", "Gift2AuctionInfoLearnMore2", "Gift2AuctionInfo", 
+              "Gift2AuctionsChangeRecipient2", "Gift2AveragePriceHint", "Gift2InfoOutConverted", 
+              "GiftAuctionInfo1Text", "GiftOfferPayMulti", "NotificationTopicExceptionsDesctription",
+              "StarRatingDescription1", "StarRatingDescription2", "StarRatingDescription3",
+              "StoryAddedToAlbumTitle", "StoryRemovedFromAlbumTitle", "SuggestAPostBelowSubtitleStarsAndTime",
+              "SuggestionAgreementReachedAdmin1", "SuggestionAgreementReachedAdmin1PastSimple", "SuggestionAgreementReachedAdmin2",
+              "SuggestionAgreementReachedAdmin3Stars", "SuggestionAgreementReachedAdmin3TON", "SuggestionAgreementReachedAdmin4Stars",
+              "SuggestionAgreementReachedAdmin4TON", "SuggestionAgreementReachedUser1", "SuggestionAgreementReachedUser1PastSimple",
+              "SuggestionAgreementReachedUser3Stars", "SuggestionAgreementReachedUser3TON", "SuggestionAgreementReachedUser4Stars",
+              "SuggestionAgreementReachedUser4TON", "UnconfirmedAuthMultipleFrom"
+          ]
+          suffixes = ["", "_one", "_other", "_few", "_many"]
+
+          def fix_content(content):
+              def repl(match):
+                  tag, body, end = match.groups()
+                  if '%' not in body: return match.group(0)
+                  placeholders = re.findall(r'%[^$0-9 \n<%>]*[sdf]', body)
+                  if len(placeholders) <= 1: return match.group(0)
+                  
+                  parts = re.split(r'(%[^$0-9 \n<%>]*[sdf])', body)
+                  count = 1
+                  for i in range(len(parts)):
+                      if re.match(r'%[^$0-9 \n<%>]*[sdf]', parts[i]):
+                          parts[i] = '%' + str(count) + '$' + parts[i][1:]
+                          count += 1
+                  return tag + "".join(parts) + end
+
+              for s in strings_to_fix:
+                  for suff in suffixes:
+                      name = s + suff
+                      pattern = r'(<string name="' + re.escape(name) + r'">)(.*?)(</string>)'
+                      content = re.sub(pattern, repl, content, flags=re.DOTALL)
+              return content
+
+          res_path = "TMessagesProj/src/main/res"
+          for root, dirs, files in os.walk(res_path):
+              for file in files:
+                  if file.endswith(".xml") and ("strings" in file or "values" in root):
+                      path = os.path.join(root, file)
+                      try:
+                          with open(path, 'r', encoding='utf-8') as f:
+                              content = f.read()
+                          new_content = fix_content(content)
+                          if content != new_content:
+                              with open(path, 'w', encoding='utf-8') as f:
+                                  f.write(new_content)
+                              print(f"Fixed strings in {path}")
+                      except Exception as e:
+                          print(f"Error processing {path}: {e}")
+          EOF
 
       - name: Configure Gradle
         run: |
